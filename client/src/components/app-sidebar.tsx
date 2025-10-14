@@ -16,7 +16,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
-  useSidebar,
 } from "@/components/ui/sidebar";
 import { Link, useLocation } from "wouter";
 
@@ -55,18 +54,15 @@ const mainItems = [
 
 export function AppSidebar() {
   const [location] = useLocation();
-  const { state } = useSidebar();
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar>
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary shrink-0">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
             <GitBranch className="h-5 w-5 text-primary-foreground" />
           </div>
-          {state === "expanded" && (
-            <span className="text-lg font-semibold">FlowForge</span>
-          )}
+          <span className="text-lg font-semibold">FlowForge</span>
         </div>
       </SidebarHeader>
       <SidebarContent>
