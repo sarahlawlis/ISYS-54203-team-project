@@ -12,6 +12,7 @@ import Workflows from "@/pages/Workflows";
 import Forms from "@/pages/Forms";
 import Attributes from "@/pages/Attributes";
 import SearchPage from "@/pages/SearchPage";
+import SearchCreation from "@/pages/SearchCreation";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/workflows" component={Workflows} />
       <Route path="/forms" component={Forms} />
       <Route path="/attributes" component={Attributes} />
+      <Route path="/search/new" component={SearchCreation} />
       <Route path="/search" component={SearchPage} />
       <Route component={NotFound} />
     </Switch>

@@ -1,4 +1,6 @@
 import { ProjectCard } from "@/components/ProjectCard";
+import { ProjectsTable } from "@/components/ProjectsTable";
+import { ViewToggle, ViewMode } from "@/components/ViewToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus, Search } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 //todo: remove mock functionality
 const mockProjects = [
@@ -72,6 +74,17 @@ const mockProjects = [
 export default function Projects() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [view, setView] = useState<ViewMode>("cards");
+
+  useEffect(() => {
+    const stored = localStorage.getItem("projects-view") as ViewMode | null;
+    if (stored) setView(stored);
+  }, []);
+
+  const handleViewChange = (newView: ViewMode) => {
+    setView(newView);
+    localStorage.setItem("projects-view", newView);
+  };
 
   return (
     <div className="h-full overflow-auto">
@@ -112,13 +125,18 @@ export default function Projects() {
               <SelectItem value="on-hold">On Hold</SelectItem>
             </SelectContent>
           </Select>
+          <ViewToggle view={view} onViewChange={handleViewChange} />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {mockProjects.map((project) => (
-            <ProjectCard key={project.id} {...project} />
-          ))}
-        </div>
+        {view === "cards" ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {mockProjects.map((project) => (
+              <ProjectCard key={project.id} {...project} />
+            ))}
+          </div>
+        ) : (
+          <ProjectsTable projects={mockProjects} />
+        )}
       </div>
     </div>
   );

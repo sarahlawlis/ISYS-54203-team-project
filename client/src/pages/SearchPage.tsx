@@ -1,9 +1,11 @@
-import { SearchFilters } from "@/components/SearchFilters";
 import { SavedSearchCard } from "@/components/SavedSearchCard";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { SavedSearchesTable } from "@/components/SavedSearchesTable";
+import { ViewToggle, ViewMode } from "@/components/ViewToggle";
 import { Button } from "@/components/ui/button";
-import { Folder, GitBranch, FileText, ExternalLink } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Plus, Search } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 
 //todo: remove mock functionality
 const mockSavedSearches = [
@@ -25,115 +27,84 @@ const mockSavedSearches = [
     filters: "type:workflow, category:marketing",
     resultCount: 8,
   },
-];
-
-const mockSearchResults = [
   {
-    id: "1",
-    type: "project",
-    title: "Customer Onboarding System",
-    description: "Streamline new customer intake with automated workflows",
-    metadata: "Active • 5 team members • 3 workflows",
+    id: "4",
+    name: "Pending Approvals",
+    filters: "type:task, status:pending, requires_approval:true",
+    resultCount: 15,
   },
   {
-    id: "2",
-    type: "workflow",
-    title: "New Employee Onboarding",
-    description: "Complete workflow for onboarding new team members",
-    metadata: "HR • 8 tasks • Used 24 times",
+    id: "5",
+    name: "Recent Form Updates",
+    filters: "type:form, modified:last_week",
+    resultCount: 7,
   },
   {
-    id: "3",
-    type: "form",
-    title: "Project Intake Form",
-    description: "Initial project information and requirements gathering",
-    metadata: "12 attributes • Used in 15 projects",
+    id: "6",
+    name: "Active Projects by Budget",
+    filters: "type:project, status:active, budget:>50000",
+    resultCount: 9,
   },
 ];
-
-const typeIcons = {
-  project: Folder,
-  workflow: GitBranch,
-  form: FileText,
-};
 
 export default function SearchPage() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [view, setView] = useState<ViewMode>("cards");
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    const stored = localStorage.getItem("searches-view") as ViewMode | null;
+    if (stored) setView(stored);
+  }, []);
+
+  const handleViewChange = (newView: ViewMode) => {
+    setView(newView);
+    localStorage.setItem("searches-view", newView);
+  };
+
+  const handleCreateSearch = () => {
+    setLocation("/search/new");
+  };
+
   return (
     <div className="h-full overflow-auto">
       <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold">Search & Reports</h1>
-          <p className="text-muted-foreground mt-1">
-            Search across all entities and save filters for quick access
-          </p>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-semibold">Saved Searches</h1>
+            <p className="text-muted-foreground mt-1">
+              Manage and run your saved search reports
+            </p>
+          </div>
+          <Button onClick={handleCreateSearch} data-testid="button-create-search">
+            <Plus className="h-4 w-4 mr-2" />
+            Create Search
+          </Button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-1">
-            <SearchFilters />
+        <div className="flex gap-4 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search saved searches..."
+              className="pl-9"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              data-testid="input-search-searches"
+            />
           </div>
-
-          <div className="lg:col-span-2 space-y-6">
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Saved Searches</h2>
-              <div className="grid gap-3">
-                {mockSavedSearches.map((search) => (
-                  <SavedSearchCard key={search.id} {...search} />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">Search Results</h2>
-                <Badge variant="outline">3 results</Badge>
-              </div>
-              <div className="space-y-3">
-                {mockSearchResults.map((result) => {
-                  const Icon = typeIcons[result.type as keyof typeof typeIcons];
-                  return (
-                    <Card
-                      key={result.id}
-                      className="rounded-card hover-elevate"
-                      data-testid={`card-result-${result.id}`}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent flex-shrink-0">
-                            <Icon className="h-5 w-5 text-accent-foreground" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Badge variant="outline" className="text-xs">
-                                {result.type}
-                              </Badge>
-                              <h3 className="font-medium text-sm truncate">
-                                {result.title}
-                              </h3>
-                            </div>
-                            <p className="text-sm text-muted-foreground line-clamp-2">
-                              {result.description}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-2 font-mono">
-                              {result.metadata}
-                            </p>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            data-testid={`button-view-result-${result.id}`}
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+          <ViewToggle view={view} onViewChange={handleViewChange} />
         </div>
+
+        {view === "cards" ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {mockSavedSearches.map((search) => (
+              <SavedSearchCard key={search.id} {...search} />
+            ))}
+          </div>
+        ) : (
+          <SavedSearchesTable searches={mockSavedSearches} />
+        )}
       </div>
     </div>
   );

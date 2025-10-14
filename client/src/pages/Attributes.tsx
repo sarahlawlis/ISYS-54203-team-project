@@ -1,4 +1,6 @@
 import { AttributeCard } from "@/components/AttributeCard";
+import { AttributesTable } from "@/components/AttributesTable";
+import { ViewToggle, ViewMode } from "@/components/ViewToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus, Search } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 //todo: remove mock functionality
 const mockAttributes = [
@@ -30,6 +32,17 @@ const mockAttributes = [
 export default function Attributes() {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [view, setView] = useState<ViewMode>("cards");
+
+  useEffect(() => {
+    const stored = localStorage.getItem("attributes-view") as ViewMode | null;
+    if (stored) setView(stored);
+  }, []);
+
+  const handleViewChange = (newView: ViewMode) => {
+    setView(newView);
+    localStorage.setItem("attributes-view", newView);
+  };
 
   return (
     <div className="h-full overflow-auto">
@@ -70,13 +83,18 @@ export default function Attributes() {
               <SelectItem value="boolean">Boolean</SelectItem>
             </SelectContent>
           </Select>
+          <ViewToggle view={view} onViewChange={handleViewChange} />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {mockAttributes.map((attr) => (
-            <AttributeCard key={attr.id} {...attr} />
-          ))}
-        </div>
+        {view === "cards" ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {mockAttributes.map((attr) => (
+              <AttributeCard key={attr.id} {...attr} />
+            ))}
+          </div>
+        ) : (
+          <AttributesTable attributes={mockAttributes} />
+        )}
       </div>
     </div>
   );

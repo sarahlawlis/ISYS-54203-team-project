@@ -1,9 +1,11 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { FormsTable } from "@/components/FormsTable";
+import { ViewToggle, ViewMode } from "@/components/ViewToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, FileText, MoreVertical } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,6 +59,17 @@ const mockForms = [
 
 export default function Forms() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [view, setView] = useState<ViewMode>("cards");
+
+  useEffect(() => {
+    const stored = localStorage.getItem("forms-view") as ViewMode | null;
+    if (stored) setView(stored);
+  }, []);
+
+  const handleViewChange = (newView: ViewMode) => {
+    setView(newView);
+    localStorage.setItem("forms-view", newView);
+  };
 
   return (
     <div className="h-full overflow-auto">
@@ -74,76 +87,83 @@ export default function Forms() {
           </Button>
         </div>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search forms..."
-            className="pl-9"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            data-testid="input-search-forms"
-          />
+        <div className="flex gap-4 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search forms..."
+              className="pl-9"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              data-testid="input-search-forms"
+            />
+          </div>
+          <ViewToggle view={view} onViewChange={handleViewChange} />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {mockForms.map((form) => (
-            <Card
-              key={form.id}
-              className="rounded-card hover-elevate"
-              data-testid={`card-form-${form.id}`}
-            >
-              <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-3">
-                <div className="flex items-start gap-3 flex-1 min-w-0">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent flex-shrink-0">
-                    <FileText className="h-5 w-5 text-accent-foreground" />
+        {view === "cards" ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {mockForms.map((form) => (
+              <Card
+                key={form.id}
+                className="rounded-card hover-elevate"
+                data-testid={`card-form-${form.id}`}
+              >
+                <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-3">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent flex-shrink-0">
+                      <FileText className="h-5 w-5 text-accent-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-base truncate" data-testid={`text-form-name-${form.id}`}>
+                        {form.name}
+                      </h3>
+                      <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                        {form.description}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-base truncate" data-testid={`text-form-name-${form.id}`}>
-                      {form.name}
-                    </h3>
-                    <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                      {form.description}
-                    </p>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" data-testid={`button-form-menu-${form.id}`}>
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem data-testid={`button-edit-form-${form.id}`}>
+                        Edit Form
+                      </DropdownMenuItem>
+                      <DropdownMenuItem data-testid={`button-duplicate-form-${form.id}`}>
+                        Duplicate
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive" data-testid={`button-delete-form-${form.id}`}>
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </CardHeader>
+                <CardContent className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="outline" className="text-xs">
+                      {form.type}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground font-mono">
+                      {form.attributeCount} attributes
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      • Used {form.usageCount}x
+                    </span>
                   </div>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" data-testid={`button-form-menu-${form.id}`}>
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem data-testid={`button-edit-form-${form.id}`}>
-                      Edit Form
-                    </DropdownMenuItem>
-                    <DropdownMenuItem data-testid={`button-duplicate-form-${form.id}`}>
-                      Duplicate
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive" data-testid={`button-delete-form-${form.id}`}>
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </CardHeader>
-              <CardContent className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="outline" className="text-xs">
-                    {form.type}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground font-mono">
-                    {form.attributeCount} attributes
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    • Used {form.usageCount}x
-                  </span>
-                </div>
-                <Button variant="outline" size="sm" data-testid={`button-edit-form-${form.id}`}>
-                  Edit
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <Button variant="outline" size="sm" data-testid={`button-edit-form-inline-${form.id}`}>
+                    Edit
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <FormsTable forms={mockForms} />
+        )}
       </div>
     </div>
   );

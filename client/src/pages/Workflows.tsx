@@ -1,8 +1,10 @@
 import { WorkflowCard } from "@/components/WorkflowCard";
+import { WorkflowsTable } from "@/components/WorkflowsTable";
+import { ViewToggle, ViewMode } from "@/components/ViewToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 //todo: remove mock functionality
 const mockWorkflows = [
@@ -58,6 +60,17 @@ const mockWorkflows = [
 
 export default function Workflows() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [view, setView] = useState<ViewMode>("cards");
+
+  useEffect(() => {
+    const stored = localStorage.getItem("workflows-view") as ViewMode | null;
+    if (stored) setView(stored);
+  }, []);
+
+  const handleViewChange = (newView: ViewMode) => {
+    setView(newView);
+    localStorage.setItem("workflows-view", newView);
+  };
 
   return (
     <div className="h-full overflow-auto">
@@ -75,22 +88,29 @@ export default function Workflows() {
           </Button>
         </div>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search workflows..."
-            className="pl-9"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            data-testid="input-search-workflows"
-          />
+        <div className="flex gap-4 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search workflows..."
+              className="pl-9"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              data-testid="input-search-workflows"
+            />
+          </div>
+          <ViewToggle view={view} onViewChange={handleViewChange} />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {mockWorkflows.map((workflow) => (
-            <WorkflowCard key={workflow.id} {...workflow} />
-          ))}
-        </div>
+        {view === "cards" ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {mockWorkflows.map((workflow) => (
+              <WorkflowCard key={workflow.id} {...workflow} />
+            ))}
+          </div>
+        ) : (
+          <WorkflowsTable workflows={mockWorkflows} />
+        )}
       </div>
     </div>
   );
