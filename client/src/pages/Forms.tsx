@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, FileText, MoreVertical } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,6 +59,7 @@ const mockForms = [
 ];
 
 export default function Forms() {
+  const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [view, setView] = useState<ViewMode>("cards");
 
@@ -81,7 +83,7 @@ export default function Forms() {
               Create and manage custom forms for projects and tasks
             </p>
           </div>
-          <Button data-testid="button-create-form">
+          <Button onClick={() => setLocation("/forms/new")} data-testid="button-create-form">
             <Plus className="h-4 w-4 mr-2" />
             Create Form
           </Button>

@@ -10,6 +10,7 @@ import Dashboard from "@/pages/Dashboard";
 import Projects from "@/pages/Projects";
 import Workflows from "@/pages/Workflows";
 import Forms from "@/pages/Forms";
+import FormCreation from "@/pages/FormCreation";
 import Attributes from "@/pages/Attributes";
 import SearchPage from "@/pages/SearchPage";
 import SearchCreation from "@/pages/SearchCreation";
@@ -21,6 +22,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/projects" component={Projects} />
       <Route path="/workflows" component={Workflows} />
+      <Route path="/forms/new" component={FormCreation} />
       <Route path="/forms" component={Forms} />
       <Route path="/attributes" component={Attributes} />
       <Route path="/search/new" component={SearchCreation} />
