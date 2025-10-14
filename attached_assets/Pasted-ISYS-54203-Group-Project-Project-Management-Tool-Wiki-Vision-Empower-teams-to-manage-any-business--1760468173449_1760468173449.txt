@@ -1,0 +1,30 @@
+ISYS 54203 Group Project Project Management Tool Wiki
+Vision
+Empower teams to manage any business process with a project management platform that adapts to their needs, allowing users design their own forms, link them to reusable workflows, and create flexible systems that grow with their projects.
+
+Features
+Form Design – allow users to create a form that can be used as a project creation page or a task. This page will also include an “attribute library” interface where users can add existing attributes to the form or create new attributes to add to the form.
+
+Workflow Design – users will have the ability to design workflows to accomplish certain tasks/get deliverables (Design a part/get a quote/create a line drawing or rendering/on board or offboard a new customer or employee/ any standard business process…)
+
+Project Creation – users will create projects from a form and use them to:
+
+store documents, notes, and information in attributes
+kick off workflows to achieve some sort of output
+track detailed history and performance of the project
+Reporting - users will have the ability to create saved searches that can filter for: • projects • project types • tasks • attributes • documents • workflows • date/time stamps •
+
+Dashboards – Users will have a dashboard to provide easy visibility to their projects, tasks, documents, saved searches, and anything else the user wants visibility to.
+
+Definitions
+Form – a page consisting of attributes that are used to display information and receive input from a user.
+
+Project – an entity that can house documents and information in attributes. A project is created from a Project Creation form.
+
+Task – a form that is used to indicate input is required from a specific entity (user/department/etc.). Tasks are placed in workflows that are kicked off within a project.
+
+Workflow – step by step process usually containing at least one task for user input. Can also contain different nodes¸ like routers, data splitters, data connecters, wait timers, *scripting, *External API connector, *etc.
+
+Attribute – label value pair placed within a form to display/capture information
+
+Saved Search – a saved set of filters that can be reused or placed within a dashboard
