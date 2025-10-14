@@ -4,7 +4,6 @@ import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   FileText, 
   Calendar, 
@@ -29,7 +28,7 @@ interface FormAttribute extends Attribute {
   formId: string;
 }
 
-const availableAttributes: Attribute[] = [
+const allAttributes: Attribute[] = [
   { id: "1", name: "Customer Name", type: "text", icon: FileText },
   { id: "2", name: "Due Date", type: "date", icon: Calendar },
   { id: "3", name: "Retailer", type: "text", icon: FileText },
@@ -38,9 +37,6 @@ const availableAttributes: Attribute[] = [
   { id: "6", name: "Quotes", type: "file", icon: Upload },
   { id: "7", name: "Purchase Orders", type: "file", icon: Upload },
   { id: "8", name: "Structure Files", type: "file", icon: Upload },
-];
-
-const nativeTools: Attribute[] = [
   { id: "n1", name: "Email", type: "email", icon: Mail },
   { id: "n2", name: "Phone Number", type: "phone", icon: Phone },
   { id: "n3", name: "Number", type: "number", icon: Hash },
@@ -129,32 +125,16 @@ export default function FormCreation() {
     <div className="h-full overflow-hidden bg-background flex">
       {/* Left Panel - Attribute Library */}
       <div className="w-72 border-r bg-card flex flex-col">
-        <div className="p-4 border-b">
-          <Tabs defaultValue="attributes" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="attributes" data-testid="tab-attributes">
-                Attributes
-              </TabsTrigger>
-              <TabsTrigger value="native" data-testid="tab-native-tools">
-                Native Tools
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="attributes" className="mt-4 space-y-2 max-h-[calc(100vh-280px)] overflow-auto">
-              {availableAttributes.map((attr) => (
-                <AttributeItem key={attr.id} attribute={attr} />
-              ))}
-            </TabsContent>
-            
-            <TabsContent value="native" className="mt-4 space-y-2 max-h-[calc(100vh-280px)] overflow-auto">
-              {nativeTools.map((tool) => (
-                <AttributeItem key={tool.id} attribute={tool} />
-              ))}
-            </TabsContent>
-          </Tabs>
+        <div className="p-4 border-b flex-1 overflow-hidden flex flex-col">
+          <h3 className="font-semibold mb-4">Attributes</h3>
+          <div className="space-y-2 overflow-auto flex-1">
+            {allAttributes.map((attr) => (
+              <AttributeItem key={attr.id} attribute={attr} />
+            ))}
+          </div>
         </div>
         
-        <div className="mt-auto p-4 border-t">
+        <div className="p-4 border-t">
           <Button className="w-full" data-testid="button-new-attribute">
             <Plus className="h-4 w-4 mr-2" />
             New Attribute
