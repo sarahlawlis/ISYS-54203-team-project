@@ -52,7 +52,7 @@ export default function FormCreation() {
   const [draggedOver, setDraggedOver] = useState(false);
 
   const handleDragStart = (e: DragEvent, attribute: Attribute) => {
-    e.dataTransfer.setData("attribute", JSON.stringify(attribute));
+    e.dataTransfer.setData("attributeId", attribute.id);
     e.dataTransfer.effectAllowed = "copy";
   };
 
@@ -71,14 +71,16 @@ export default function FormCreation() {
     e.preventDefault();
     setDraggedOver(false);
     
-    const attributeData = e.dataTransfer.getData("attribute");
-    if (attributeData) {
-      const attribute: Attribute = JSON.parse(attributeData);
-      const newFormAttribute: FormAttribute = {
-        ...attribute,
-        formId: `form-${Date.now()}`,
-      };
-      setFormAttributes([...formAttributes, newFormAttribute]);
+    const attributeId = e.dataTransfer.getData("attributeId");
+    if (attributeId) {
+      const attribute = allAttributes.find(attr => attr.id === attributeId);
+      if (attribute) {
+        const newFormAttribute: FormAttribute = {
+          ...attribute,
+          formId: `form-${Date.now()}`,
+        };
+        setFormAttributes([...formAttributes, newFormAttribute]);
+      }
     }
   };
 
