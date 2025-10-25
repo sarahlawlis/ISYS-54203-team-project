@@ -57,7 +57,12 @@ export function FormsTable({ forms }: FormsTableProps) {
               <TableCell className="text-muted-foreground">{form.usageCount}x</TableCell>
               <TableCell>
                 <div className="flex items-center gap-1">
-                  <Button size="sm" variant="outline" data-testid={`button-edit-form-${form.id}`}>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => window.location.href = "/forms/new"}
+                    data-testid={`button-edit-form-${form.id}`}
+                  >
                     Edit
                   </Button>
                   <DropdownMenu>

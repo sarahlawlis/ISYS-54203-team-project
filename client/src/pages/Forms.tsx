@@ -132,7 +132,10 @@ export default function Forms() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem data-testid={`button-edit-form-${form.id}`}>
+                      <DropdownMenuItem 
+                        onClick={() => setLocation("/forms/new")}
+                        data-testid={`button-edit-form-${form.id}`}
+                      >
                         Edit Form
                       </DropdownMenuItem>
                       <DropdownMenuItem data-testid={`button-duplicate-form-${form.id}`}>
@@ -156,7 +159,12 @@ export default function Forms() {
                       • Used {form.usageCount}x
                     </span>
                   </div>
-                  <Button variant="outline" size="sm" data-testid={`button-edit-form-inline-${form.id}`}>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setLocation("/forms/new")}
+                    data-testid={`button-edit-form-inline-${form.id}`}
+                  >
                     Edit
                   </Button>
                 </CardContent>

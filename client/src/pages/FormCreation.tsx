@@ -1,9 +1,11 @@
+
 import { useState } from "react";
 import type { DragEvent } from "react";
 import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   FileText, 
   Calendar, 
@@ -14,8 +16,13 @@ import {
   Mail,
   Phone,
   Link as LinkIcon,
-  Plus
+  Plus,
+  GripVertical,
+  X
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 interface Attribute {
   id: string;
@@ -26,6 +33,9 @@ interface Attribute {
 
 interface FormAttribute extends Attribute {
   formId: string;
+  required?: boolean;
+  hidden?: boolean;
+  editable?: boolean;
 }
 
 const allAttributes: Attribute[] = [
@@ -50,6 +60,7 @@ export default function FormCreation() {
   const [formDescription, setFormDescription] = useState("");
   const [formAttributes, setFormAttributes] = useState<FormAttribute[]>([]);
   const [draggedOver, setDraggedOver] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const handleDragStart = (e: DragEvent, attribute: Attribute) => {
     e.dataTransfer.setData("attributeId", attribute.id);
@@ -78,14 +89,57 @@ export default function FormCreation() {
         const newFormAttribute: FormAttribute = {
           ...attribute,
           formId: `form-${Date.now()}`,
+          required: false,
+          hidden: false,
+          editable: true,
         };
         setFormAttributes([...formAttributes, newFormAttribute]);
       }
     }
   };
 
+  const handleReorderDragStart = (e: DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleReorderDragOver = (e: DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    const newAttributes = [...formAttributes];
+    const draggedItem = newAttributes[draggedIndex];
+    newAttributes.splice(draggedIndex, 1);
+    newAttributes.splice(index, 0, draggedItem);
+    
+    setFormAttributes(newAttributes);
+    setDraggedIndex(index);
+  };
+
+  const handleReorderDragEnd = () => {
+    setDraggedIndex(null);
+  };
+
   const handleRemoveAttribute = (formId: string) => {
     setFormAttributes(formAttributes.filter(attr => attr.formId !== formId));
+  };
+
+  const toggleRequired = (formId: string) => {
+    setFormAttributes(formAttributes.map(attr => 
+      attr.formId === formId ? { ...attr, required: !attr.required } : attr
+    ));
+  };
+
+  const toggleHidden = (formId: string) => {
+    setFormAttributes(formAttributes.map(attr => 
+      attr.formId === formId ? { ...attr, hidden: !attr.hidden } : attr
+    ));
+  };
+
+  const toggleEditable = (formId: string) => {
+    setFormAttributes(formAttributes.map(attr => 
+      attr.formId === formId ? { ...attr, editable: !attr.editable } : attr
+    ));
   };
 
   const handleSaveForm = () => {
@@ -123,12 +177,55 @@ export default function FormCreation() {
     );
   };
 
+  const renderFieldPreview = (attr: FormAttribute) => {
+    const Icon = attr.icon;
+    
+    return (
+      <div className="flex-1">
+        <div className="flex items-center gap-2 mb-2">
+          <Icon className="h-4 w-4 text-muted-foreground" />
+          <Label className="font-medium">{attr.name}</Label>
+          {attr.required && <span className="text-red-500">*</span>}
+        </div>
+        
+        {attr.type === "textarea" || attr.type === "text" && attr.name.toLowerCase().includes("notes") ? (
+          <Textarea 
+            placeholder={`Enter ${attr.name.toLowerCase()}`}
+            className="w-full"
+            disabled
+          />
+        ) : attr.type === "file" ? (
+          <div className="border-2 border-dashed rounded-lg p-6 text-center">
+            <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Drag your file(s) to start uploading</p>
+            <p className="text-xs text-muted-foreground mt-1">OR</p>
+            <Button variant="outline" size="sm" className="mt-2" disabled>
+              Browse files
+            </Button>
+          </div>
+        ) : attr.type === "Y/N" ? (
+          <div className="flex items-center gap-2">
+            <Switch disabled />
+            <span className="text-sm text-muted-foreground">Yes/No</span>
+          </div>
+        ) : (
+          <Input 
+            type={attr.type === "date" ? "date" : attr.type === "number" ? "number" : attr.type === "email" ? "email" : attr.type === "phone" ? "tel" : attr.type === "url" ? "url" : "text"}
+            placeholder={`Enter ${attr.name.toLowerCase()}`}
+            className="w-full"
+            disabled
+          />
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="h-full overflow-hidden bg-background flex">
       {/* Left Panel - Attribute Library */}
       <div className="w-72 border-r bg-card flex flex-col">
         <div className="p-4 border-b flex-1 overflow-hidden flex flex-col">
-          <h3 className="font-semibold mb-4">Attributes</h3>
+          <h3 className="font-semibold mb-4">Attribute Library</h3>
           <div className="space-y-2 overflow-auto flex-1">
             {allAttributes.map((attr) => (
               <AttributeItem key={attr.id} attribute={attr} />
@@ -150,14 +247,16 @@ export default function FormCreation() {
           <div>
             <h1 className="text-2xl font-semibold">Form Designer</h1>
             <p className="text-muted-foreground mt-1">
-              Drag and drop attributes from the library to build your custom form.
+              Drag and drop attributes from the library to build your custom form
             </p>
           </div>
 
           <div className="space-y-4">
             <div className="space-y-2">
+              <Label htmlFor="form-name">Form Name <span className="text-red-500">*</span></Label>
               <Input
-                placeholder="Form Name"
+                id="form-name"
+                placeholder="Enter form name"
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
                 className="text-base"
@@ -166,8 +265,10 @@ export default function FormCreation() {
             </div>
 
             <div className="space-y-2">
-              <Input
-                placeholder="Form Description"
+              <Label htmlFor="form-description">Description</Label>
+              <Textarea
+                id="form-description"
+                placeholder="Enter form description"
                 value={formDescription}
                 onChange={(e) => setFormDescription(e.target.value)}
                 className="text-base"
@@ -175,12 +276,12 @@ export default function FormCreation() {
               />
             </div>
 
-            {/* Drop Zone */}
+            {/* Drop Zone / Form Fields */}
             <div
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              className={`border-2 border-dashed rounded-card p-8 min-h-[400px] transition-colors ${
+              className={`border-2 border-dashed rounded-card p-6 min-h-[400px] transition-colors ${
                 draggedOver
                   ? "border-primary bg-primary/5"
                   : formAttributes.length === 0
@@ -197,29 +298,74 @@ export default function FormCreation() {
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {formAttributes.map((attr) => (
-                    <Card key={attr.formId} className="relative" data-testid={`form-attribute-${attr.formId}`}>
-                      <CardContent className="p-4 flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3 flex-1">
-                          <div className="flex h-8 w-8 items-center justify-center rounded bg-accent flex-shrink-0">
-                            <attr.icon className="h-4 w-4 text-accent-foreground" />
+                <div className="space-y-4">
+                  {formAttributes.map((attr, index) => (
+                    <div
+                      key={attr.formId}
+                      draggable
+                      onDragStart={(e) => handleReorderDragStart(e, index)}
+                      onDragOver={(e) => handleReorderDragOver(e, index)}
+                      onDragEnd={handleReorderDragEnd}
+                      className={`border rounded-lg p-4 bg-card transition-all ${
+                        draggedIndex === index ? "opacity-50" : ""
+                      }`}
+                      data-testid={`form-attribute-${attr.formId}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Drag Handle */}
+                        <div className="cursor-move mt-1">
+                          <GripVertical className="h-5 w-5 text-muted-foreground" />
+                        </div>
+
+                        {/* Field Preview */}
+                        {renderFieldPreview(attr)}
+
+                        {/* Field Options */}
+                        <div className="flex flex-col gap-2 min-w-[140px]">
+                          <div className="flex items-center justify-between gap-2">
+                            <Badge variant={attr.hidden ? "secondary" : "outline"} className="text-xs">
+                              {attr.hidden ? "Hidden" : "Visible"}
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => handleRemoveAttribute(attr.formId)}
+                              data-testid={`button-remove-${attr.formId}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
                           </div>
-                          <div>
-                            <p className="font-medium">{attr.name}</p>
-                            <p className="text-xs text-muted-foreground">{attr.type}</p>
+                          
+                          <div className="flex items-center gap-2 text-xs">
+                            <Switch
+                              checked={attr.required}
+                              onCheckedChange={() => toggleRequired(attr.formId)}
+                              className="scale-75"
+                            />
+                            <span className="text-muted-foreground">Required</span>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-xs">
+                            <Switch
+                              checked={!attr.hidden}
+                              onCheckedChange={() => toggleHidden(attr.formId)}
+                              className="scale-75"
+                            />
+                            <span className="text-muted-foreground">Visible</span>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-xs">
+                            <Switch
+                              checked={attr.editable}
+                              onCheckedChange={() => toggleEditable(attr.formId)}
+                              className="scale-75"
+                            />
+                            <span className="text-muted-foreground">Editable</span>
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveAttribute(attr.formId)}
-                          data-testid={`button-remove-${attr.formId}`}
-                        >
-                          Remove
-                        </Button>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
