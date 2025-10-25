@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { DragEvent } from "react";
 import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,8 +21,14 @@ import {
   X
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Attribute {
   id: string;
@@ -33,9 +39,7 @@ interface Attribute {
 
 interface FormAttribute extends Attribute {
   formId: string;
-  required?: boolean;
-  hidden?: boolean;
-  editable?: boolean;
+  visibility: 'Editable' | 'Required' | 'Read Only' | 'Hidden';
 }
 
 const allAttributes: Attribute[] = [
@@ -61,6 +65,23 @@ export default function FormCreation() {
   const [formAttributes, setFormAttributes] = useState<FormAttribute[]>([]);
   const [draggedOver, setDraggedOver] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  // Load form data when editing existing form
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const formId = params.get('formId');
+    
+    if (formId) {
+      const storedFormData = localStorage.getItem(`formData-${formId}`);
+      if (storedFormData) {
+        const { name, description } = JSON.parse(storedFormData);
+        setFormName(name || "");
+        setFormDescription(description || "");
+        // Clean up after loading
+        localStorage.removeItem(`formData-${formId}`);
+      }
+    }
+  }, []);
 
   const handleDragStart = (e: DragEvent, attribute: Attribute) => {
     e.dataTransfer.setData("attributeId", attribute.id);
@@ -89,9 +110,7 @@ export default function FormCreation() {
         const newFormAttribute: FormAttribute = {
           ...attribute,
           formId: `form-${Date.now()}`,
-          required: false,
-          hidden: false,
-          editable: true,
+          visibility: 'Editable',
         };
         setFormAttributes([...formAttributes, newFormAttribute]);
       }
@@ -124,21 +143,9 @@ export default function FormCreation() {
     setFormAttributes(formAttributes.filter(attr => attr.formId !== formId));
   };
 
-  const toggleRequired = (formId: string) => {
+  const updateVisibility = (formId: string, visibility: 'Editable' | 'Required' | 'Read Only' | 'Hidden') => {
     setFormAttributes(formAttributes.map(attr => 
-      attr.formId === formId ? { ...attr, required: !attr.required } : attr
-    ));
-  };
-
-  const toggleHidden = (formId: string) => {
-    setFormAttributes(formAttributes.map(attr => 
-      attr.formId === formId ? { ...attr, hidden: !attr.hidden } : attr
-    ));
-  };
-
-  const toggleEditable = (formId: string) => {
-    setFormAttributes(formAttributes.map(attr => 
-      attr.formId === formId ? { ...attr, editable: !attr.editable } : attr
+      attr.formId === formId ? { ...attr, visibility } : attr
     ));
   };
 
@@ -185,7 +192,7 @@ export default function FormCreation() {
         <div className="flex items-center gap-2 mb-2">
           <Icon className="h-4 w-4 text-muted-foreground" />
           <Label className="font-medium">{attr.name}</Label>
-          {attr.required && <span className="text-red-500">*</span>}
+          {attr.visibility === 'Required' && <span className="text-red-500">*</span>}
         </div>
         
         {attr.type === "textarea" || attr.type === "text" && attr.name.toLowerCase().includes("notes") ? (
@@ -221,11 +228,28 @@ export default function FormCreation() {
   };
 
   return (
-    <div className="h-full overflow-hidden bg-background flex">
-      {/* Left Panel - Attribute Library */}
-      <div className="w-72 border-r bg-card flex flex-col">
-        <div className="p-4 border-b flex-1 overflow-hidden flex flex-col">
-          <h3 className="font-semibold mb-4">Attribute Library</h3>
+    <div className="h-full overflow-hidden bg-background flex flex-col">
+      {/* Header with Back Button */}
+      <div className="border-b bg-card px-6 py-4">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" onClick={handleCancel} data-testid="button-back">
+            Back
+          </Button>
+          <div>
+            <h1 className="text-2xl font-semibold">Form Designer</h1>
+            <p className="text-muted-foreground text-sm">
+              Drag and drop attributes from the library to build your custom form
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 overflow-hidden flex">
+        {/* Left Panel - Attribute Library */}
+        <div className="w-72 border-r bg-card flex flex-col">
+          <div className="p-4 border-b flex-1 overflow-hidden flex flex-col">
+            <h3 className="font-semibold mb-4">Attribute Library</h3>
           <div className="space-y-2 overflow-auto flex-1">
             {allAttributes.map((attr) => (
               <AttributeItem key={attr.id} attribute={attr} />
@@ -244,13 +268,6 @@ export default function FormCreation() {
       {/* Right Panel - Form Builder */}
       <div className="flex-1 overflow-auto">
         <div className="p-6 max-w-5xl mx-auto space-y-6">
-          <div>
-            <h1 className="text-2xl font-semibold">Form Designer</h1>
-            <p className="text-muted-foreground mt-1">
-              Drag and drop attributes from the library to build your custom form
-            </p>
-          </div>
-
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="form-name">Form Name <span className="text-red-500">*</span></Label>
@@ -322,10 +339,7 @@ export default function FormCreation() {
 
                         {/* Field Options */}
                         <div className="flex flex-col gap-2 min-w-[140px]">
-                          <div className="flex items-center justify-between gap-2">
-                            <Badge variant={attr.hidden ? "secondary" : "outline"} className="text-xs">
-                              {attr.hidden ? "Hidden" : "Visible"}
-                            </Badge>
+                          <div className="flex items-center justify-end gap-2">
                             <Button
                               variant="ghost"
                               size="icon"
@@ -337,31 +351,22 @@ export default function FormCreation() {
                             </Button>
                           </div>
                           
-                          <div className="flex items-center gap-2 text-xs">
-                            <Switch
-                              checked={attr.required}
-                              onCheckedChange={() => toggleRequired(attr.formId)}
-                              className="scale-75"
-                            />
-                            <span className="text-muted-foreground">Required</span>
-                          </div>
-
-                          <div className="flex items-center gap-2 text-xs">
-                            <Switch
-                              checked={!attr.hidden}
-                              onCheckedChange={() => toggleHidden(attr.formId)}
-                              className="scale-75"
-                            />
-                            <span className="text-muted-foreground">Visible</span>
-                          </div>
-
-                          <div className="flex items-center gap-2 text-xs">
-                            <Switch
-                              checked={attr.editable}
-                              onCheckedChange={() => toggleEditable(attr.formId)}
-                              className="scale-75"
-                            />
-                            <span className="text-muted-foreground">Editable</span>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Visibility</Label>
+                            <Select
+                              value={attr.visibility}
+                              onValueChange={(value) => updateVisibility(attr.formId, value as 'Editable' | 'Required' | 'Read Only' | 'Hidden')}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Editable">Editable</SelectItem>
+                                <SelectItem value="Required">Required</SelectItem>
+                                <SelectItem value="Read Only">Read Only</SelectItem>
+                                <SelectItem value="Hidden">Hidden</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                         </div>
                       </div>
@@ -385,6 +390,7 @@ export default function FormCreation() {
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }

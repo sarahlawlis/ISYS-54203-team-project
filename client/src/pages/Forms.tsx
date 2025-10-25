@@ -133,7 +133,13 @@ export default function Forms() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem 
-                        onClick={() => setLocation("/forms/new")}
+                        onClick={() => {
+                          localStorage.setItem(`formData-${form.id}`, JSON.stringify({ 
+                            name: form.name, 
+                            description: form.description 
+                          }));
+                          setLocation(`/forms/new?formId=${form.id}`);
+                        }}
                         data-testid={`button-edit-form-${form.id}`}
                       >
                         Edit Form
@@ -162,7 +168,13 @@ export default function Forms() {
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    onClick={() => setLocation("/forms/new")}
+                    onClick={() => {
+                      localStorage.setItem(`formData-${form.id}`, JSON.stringify({ 
+                        name: form.name, 
+                        description: form.description 
+                      }));
+                      setLocation(`/forms/new?formId=${form.id}`);
+                    }}
                     data-testid={`button-edit-form-inline-${form.id}`}
                   >
                     Edit
