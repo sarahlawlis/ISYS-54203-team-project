@@ -76,11 +76,10 @@ export default function FormCreation() {
     if (formId) {
       const storedFormData = localStorage.getItem(`formData-${formId}`);
       if (storedFormData) {
-        const { name, description } = JSON.parse(storedFormData);
-        setFormName(name || "");
-        setFormDescription(description || "");
-        // Clean up after loading
-        localStorage.removeItem(`formData-${formId}`);
+        const formData = JSON.parse(storedFormData);
+        setFormName(formData.name || "");
+        setFormDescription(formData.description || "");
+        setFormAttributes(formData.attributes || []);
       }
     }
   }, []);
@@ -152,7 +151,20 @@ export default function FormCreation() {
   };
 
   const handleSaveForm = () => {
-    console.log("Saving form:", { formName, formDescription, formAttributes });
+    const params = new URLSearchParams(window.location.search);
+    const formId = params.get('formId');
+    
+    if (formId) {
+      // Update existing form
+      const formData = {
+        name: formName,
+        description: formDescription,
+        attributes: formAttributes,
+      };
+      localStorage.setItem(`formData-${formId}`, JSON.stringify(formData));
+      console.log("Form saved:", formData);
+    }
+    
     setLocation("/forms");
   };
 

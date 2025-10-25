@@ -134,10 +134,15 @@ export default function Forms() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem 
                         onClick={() => {
-                          localStorage.setItem(`formData-${form.id}`, JSON.stringify({ 
-                            name: form.name, 
-                            description: form.description 
-                          }));
+                          // Load existing form data or create new entry
+                          const existingData = localStorage.getItem(`formData-${form.id}`);
+                          if (!existingData) {
+                            localStorage.setItem(`formData-${form.id}`, JSON.stringify({ 
+                              name: form.name, 
+                              description: form.description,
+                              attributes: []
+                            }));
+                          }
                           setLocation(`/forms/new?formId=${form.id}`);
                         }}
                         data-testid={`button-edit-form-${form.id}`}
@@ -169,10 +174,15 @@ export default function Forms() {
                     variant="outline" 
                     size="sm" 
                     onClick={() => {
-                      localStorage.setItem(`formData-${form.id}`, JSON.stringify({ 
-                        name: form.name, 
-                        description: form.description 
-                      }));
+                      // Load existing form data or create new entry
+                      const existingData = localStorage.getItem(`formData-${form.id}`);
+                      if (!existingData) {
+                        localStorage.setItem(`formData-${form.id}`, JSON.stringify({ 
+                          name: form.name, 
+                          description: form.description,
+                          attributes: []
+                        }));
+                      }
                       setLocation(`/forms/new?formId=${form.id}`);
                     }}
                     data-testid={`button-edit-form-inline-${form.id}`}
