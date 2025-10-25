@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import type { DragEvent } from "react";
 import { useLocation } from "wouter";
@@ -19,7 +18,8 @@ import {
   Link as LinkIcon,
   Plus,
   GripVertical,
-  X
+  X,
+  Search
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -66,12 +66,13 @@ export default function FormCreation() {
   const [formAttributes, setFormAttributes] = useState<FormAttribute[]>([]);
   const [draggedOver, setDraggedOver] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [attributeSearch, setAttributeSearch] = useState("");
 
   // Load form data when editing existing form
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const formId = params.get('formId');
-    
+
     if (formId) {
       const storedFormData = localStorage.getItem(`formData-${formId}`);
       if (storedFormData) {
@@ -103,7 +104,7 @@ export default function FormCreation() {
   const handleDrop = (e: DragEvent) => {
     e.preventDefault();
     setDraggedOver(false);
-    
+
     const attributeId = e.dataTransfer.getData("attributeId");
     if (attributeId) {
       const attribute = allAttributes.find(attr => attr.id === attributeId);
@@ -131,7 +132,7 @@ export default function FormCreation() {
     const draggedItem = newAttributes[draggedIndex];
     newAttributes.splice(draggedIndex, 1);
     newAttributes.splice(index, 0, draggedItem);
-    
+
     setFormAttributes(newAttributes);
     setDraggedIndex(index);
   };
@@ -187,7 +188,7 @@ export default function FormCreation() {
 
   const renderFieldPreview = (attr: FormAttribute) => {
     const Icon = attr.icon;
-    
+
     return (
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-2">
@@ -195,7 +196,7 @@ export default function FormCreation() {
           <Label className="font-medium">{attr.name}</Label>
           {attr.visibility === 'Required' && <span className="text-red-500">*</span>}
         </div>
-        
+
         {attr.type === "textarea" || attr.type === "text" && attr.name.toLowerCase().includes("notes") ? (
           <Textarea 
             placeholder={`Enter ${attr.name.toLowerCase()}`}
@@ -228,6 +229,8 @@ export default function FormCreation() {
     );
   };
 
+  const availableAttributes = allAttributes; // Keep this for now, will be filtered by search
+
   return (
     <div className="h-full overflow-hidden bg-background flex flex-col">
       {/* Header with Back Button */}
@@ -251,147 +254,161 @@ export default function FormCreation() {
         <div className="w-72 border-r bg-card flex flex-col">
           <div className="p-4 border-b flex-1 overflow-hidden flex flex-col">
             <h3 className="font-semibold mb-4">Attribute Library</h3>
-          <div className="space-y-2 overflow-auto flex-1">
-            {allAttributes.map((attr) => (
-              <AttributeItem key={attr.id} attribute={attr} />
-            ))}
+            <div className="relative mb-3">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search"
+                className="pl-9"
+                value={attributeSearch}
+                onChange={(e) => setAttributeSearch(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2 overflow-auto flex-1">
+              {availableAttributes
+                .filter((attr) => 
+                  attr.name.toLowerCase().includes(attributeSearch.toLowerCase()) ||
+                  attr.type.toLowerCase().includes(attributeSearch.toLowerCase())
+                )
+                .map((attr) => (
+                <AttributeItem key={attr.id} attribute={attr} />
+              ))}
+            </div>
+          </div>
+
+          <div className="p-4 border-t">
+            <Button className="w-full" data-testid="button-new-attribute">
+              <Plus className="h-4 w-4 mr-2" />
+              New Attribute
+            </Button>
           </div>
         </div>
-        
-        <div className="p-4 border-t">
-          <Button className="w-full" data-testid="button-new-attribute">
-            <Plus className="h-4 w-4 mr-2" />
-            New Attribute
-          </Button>
-        </div>
-      </div>
 
-      {/* Right Panel - Form Builder */}
-      <div className="flex-1 overflow-auto">
-        <div className="p-6 max-w-5xl mx-auto space-y-6">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="form-name">Form Name <span className="text-red-500">*</span></Label>
-              <Input
-                id="form-name"
-                placeholder="Enter form name"
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-                className="text-base"
-                data-testid="input-form-name"
-              />
-            </div>
+        {/* Right Panel - Form Builder */}
+        <div className="flex-1 overflow-auto">
+          <div className="p-6 max-w-5xl mx-auto space-y-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="form-name">Form Name <span className="text-red-500">*</span></Label>
+                <Input
+                  id="form-name"
+                  placeholder="Enter form name"
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                  className="text-base"
+                  data-testid="input-form-name"
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="form-description">Description</Label>
-              <Textarea
-                id="form-description"
-                placeholder="Enter form description"
-                value={formDescription}
-                onChange={(e) => setFormDescription(e.target.value)}
-                className="text-base"
-                data-testid="input-form-description"
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="form-description">Description</Label>
+                <Textarea
+                  id="form-description"
+                  placeholder="Enter form description"
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  className="text-base"
+                  data-testid="input-form-description"
+                />
+              </div>
 
-            {/* Drop Zone / Form Fields */}
-            <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              className={`border-2 border-dashed rounded-card p-6 min-h-[400px] transition-colors ${
-                draggedOver
-                  ? "border-primary bg-primary/5"
-                  : formAttributes.length === 0
-                  ? "border-border"
-                  : "border-border"
-              }`}
-              data-testid="drop-zone"
-            >
-              {formAttributes.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-center py-16">
-                  <h3 className="text-lg font-semibold mb-2">Drag and drop attributes here</h3>
-                  <p className="text-sm text-muted-foreground max-w-md">
-                    Start building your form by dragging attributes from the library.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {formAttributes.map((attr, index) => (
-                    <div
-                      key={attr.formId}
-                      draggable
-                      onDragStart={(e) => handleReorderDragStart(e, index)}
-                      onDragOver={(e) => handleReorderDragOver(e, index)}
-                      onDragEnd={handleReorderDragEnd}
-                      className={`border rounded-lg p-4 bg-card transition-all ${
-                        draggedIndex === index ? "opacity-50" : ""
-                      }`}
-                      data-testid={`form-attribute-${attr.formId}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        {/* Drag Handle */}
-                        <div className="cursor-move mt-1">
-                          <GripVertical className="h-5 w-5 text-muted-foreground" />
-                        </div>
-
-                        {/* Field Preview */}
-                        {renderFieldPreview(attr)}
-
-                        {/* Field Options */}
-                        <div className="flex flex-col gap-2 min-w-[140px]">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => handleRemoveAttribute(attr.formId)}
-                              data-testid={`button-remove-${attr.formId}`}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
+              {/* Drop Zone / Form Fields */}
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`border-2 border-dashed rounded-card p-6 min-h-[400px] transition-colors ${
+                  draggedOver
+                    ? "border-primary bg-primary/5"
+                    : formAttributes.length === 0
+                    ? "border-border"
+                    : "border-border"
+                }`}
+                data-testid="drop-zone"
+              >
+                {formAttributes.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center py-16">
+                    <h3 className="text-lg font-semibold mb-2">Drag and drop attributes here</h3>
+                    <p className="text-sm text-muted-foreground max-w-md">
+                      Start building your form by dragging attributes from the library.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {formAttributes.map((attr, index) => (
+                      <div
+                        key={attr.formId}
+                        draggable
+                        onDragStart={(e) => handleReorderDragStart(e, index)}
+                        onDragOver={(e) => handleReorderDragOver(e, index)}
+                        onDragEnd={handleReorderDragEnd}
+                        className={`border rounded-lg p-4 bg-card transition-all ${
+                          draggedIndex === index ? "opacity-50" : ""
+                        }`}
+                        data-testid={`form-attribute-${attr.formId}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          {/* Drag Handle */}
+                          <div className="cursor-move mt-1">
+                            <GripVertical className="h-5 w-5 text-muted-foreground" />
                           </div>
-                          
-                          <div className="space-y-1">
-                            <Label className="text-xs text-muted-foreground">Visibility</Label>
-                            <Select
-                              value={attr.visibility}
-                              onValueChange={(value) => updateVisibility(attr.formId, value as 'Editable' | 'Required' | 'Read Only' | 'Hidden')}
-                            >
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Editable">Editable</SelectItem>
-                                <SelectItem value="Required">Required</SelectItem>
-                                <SelectItem value="Read Only">Read Only</SelectItem>
-                                <SelectItem value="Hidden">Hidden</SelectItem>
-                              </SelectContent>
-                            </Select>
+
+                          {/* Field Preview */}
+                          {renderFieldPreview(attr)}
+
+                          {/* Field Options */}
+                          <div className="flex flex-col gap-2 min-w-[140px]">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => handleRemoveAttribute(attr.formId)}
+                                data-testid={`button-remove-${attr.formId}`}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Visibility</Label>
+                              <Select
+                                value={attr.visibility}
+                                onValueChange={(value) => updateVisibility(attr.formId, value as 'Editable' | 'Required' | 'Read Only' | 'Hidden')}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Editable">Editable</SelectItem>
+                                  <SelectItem value="Required">Required</SelectItem>
+                                  <SelectItem value="Read Only">Read Only</SelectItem>
+                                  <SelectItem value="Hidden">Hidden</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t">
-            <Button variant="outline" onClick={handleCancel} data-testid="button-cancel">
-              Cancel
-            </Button>
-            <Button variant="outline" onClick={handleSaveAs} data-testid="button-save-as">
-              Save As
-            </Button>
-            <Button onClick={handleSaveForm} data-testid="button-save-form">
-              Save Form
-            </Button>
+            <div className="flex items-center justify-end gap-3 pt-4 border-t">
+              <Button variant="outline" onClick={handleCancel} data-testid="button-cancel">
+                Cancel
+              </Button>
+              <Button variant="outline" onClick={handleSaveAs} data-testid="button-save-as">
+                Save As
+              </Button>
+              <Button onClick={handleSaveForm} data-testid="button-save-form">
+                Save Form
+              </Button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
     </div>
   );
 }
