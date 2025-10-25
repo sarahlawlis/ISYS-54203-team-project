@@ -79,7 +79,16 @@ export default function FormCreation() {
         const formData = JSON.parse(storedFormData);
         setFormName(formData.name || "");
         setFormDescription(formData.description || "");
-        setFormAttributes(formData.attributes || []);
+        
+        // Restore icon property by matching attribute ID
+        const restoredAttributes = (formData.attributes || []).map((attr: any) => {
+          const matchingAttr = allAttributes.find(a => a.id === attr.id);
+          return {
+            ...attr,
+            icon: matchingAttr?.icon || FileText,
+          };
+        });
+        setFormAttributes(restoredAttributes);
       }
     }
   }, []);
@@ -155,11 +164,11 @@ export default function FormCreation() {
     const formId = params.get('formId');
     
     if (formId) {
-      // Update existing form
+      // Update existing form - exclude icon from serialization
       const formData = {
         name: formName,
         description: formDescription,
-        attributes: formAttributes,
+        attributes: formAttributes.map(({ icon, ...attr }) => attr),
       };
       localStorage.setItem(`formData-${formId}`, JSON.stringify(formData));
       console.log("Form saved:", formData);
