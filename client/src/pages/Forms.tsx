@@ -64,10 +64,8 @@ export default function Forms() {
   const [searchTerm, setSearchTerm] = useState("");
   const [view, setView] = useState<ViewMode>("cards");
 
-  const { data: forms = [], refetch } = useQuery({
+  const { data: forms = [] } = useQuery<typeof mockForms>({
     queryKey: ["/api/forms"],
-    // Placeholder data for initial load, replace with actual API call
-    placeholderData: mockForms,
   });
 
   useEffect(() => {
@@ -112,7 +110,12 @@ export default function Forms() {
 
         {view === "cards" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {forms.map((form) => (
+            {forms
+              .filter(form => 
+                form.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                form.description?.toLowerCase().includes(searchTerm.toLowerCase())
+              )
+              .map((form) => (
               <Card
                 key={form.id}
                 className="rounded-card hover-elevate"
@@ -201,7 +204,10 @@ export default function Forms() {
             ))}
           </div>
         ) : (
-          <FormsTable forms={forms} />
+          <FormsTable forms={forms.filter(form => 
+            form.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            form.description?.toLowerCase().includes(searchTerm.toLowerCase())
+          )} />
         )}
       </div>
     </div>
