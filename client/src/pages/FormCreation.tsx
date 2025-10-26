@@ -117,24 +117,33 @@ export default function FormCreation() {
     const formId = params.get('formId');
 
     if (formId) {
-      const storedFormData = localStorage.getItem(`formData-${formId}`);
-      if (storedFormData) {
-        const formData = JSON.parse(storedFormData);
-        setFormName(formData.name || "");
-        setFormDescription(formData.description || "");
-        
-        // Restore icon property by matching attribute ID
-        const restoredAttributes = (formData.attributes || []).map((attr: any) => {
-          const matchingAttr = allAttributes.find(a => a.id === attr.id);
-          return {
-            ...attr,
-            icon: matchingAttr?.icon || FileText,
-          };
-        });
-        setFormAttributes(restoredAttributes);
-      }
+      // Fetch form data from the database
+      const fetchFormData = async () => {
+        try {
+          const response = await fetch(`/api/forms/${formId}`);
+          if (!response.ok) {
+            throw new Error("Failed to fetch form data");
+          }
+          const formData = await response.json();
+          setFormName(formData.name || "");
+          setFormDescription(formData.description || "");
+
+          // Restore icon property by matching attribute ID
+          const restoredAttributes = (JSON.parse(formData.attributes) || []).map((attr: any) => {
+            const matchingAttr = allAttributes.find(a => a.id === attr.id);
+            return {
+              ...attr,
+              icon: matchingAttr?.icon || FileText,
+            };
+          });
+          setFormAttributes(restoredAttributes);
+        } catch (error) {
+          console.error("Error loading form data:", error);
+        }
+      };
+      fetchFormData();
     }
-  }, []);
+  }, [allAttributes]); // Dependency array includes allAttributes
 
   const handleDragStart = (e: DragEvent, attribute: Attribute) => {
     e.dataTransfer.setData("attributeId", attribute.id);
@@ -202,22 +211,41 @@ export default function FormCreation() {
     ));
   };
 
-  const handleSaveForm = () => {
+  const handleSaveForm = async () => {
     const params = new URLSearchParams(window.location.search);
     const formId = params.get('formId');
-    
-    if (formId) {
-      // Update existing form - exclude icon from serialization
-      const formData = {
-        name: formName,
-        description: formDescription,
-        attributes: formAttributes.map(({ icon, ...attr }) => attr),
-      };
-      localStorage.setItem(`formData-${formId}`, JSON.stringify(formData));
-      console.log("Form saved:", formData);
+
+    // Prepare form data - exclude icon from serialization
+    const formData = {
+      name: formName,
+      description: formDescription,
+      attributes: JSON.stringify(formAttributes.map(({ icon, ...attr }) => attr)),
+      attributeCount: formAttributes.length.toString(),
+      usageCount: "0",
+      type: "project",
+    };
+
+    try {
+      if (formId) {
+        // Update existing form
+        await fetch(`/api/forms/${formId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+      } else {
+        // Create new form
+        await fetch('/api/forms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+      }
+
+      setLocation("/forms");
+    } catch (error) {
+      console.error("Failed to save form:", error);
     }
-    
-    setLocation("/forms");
   };
 
   const handleSaveAs = () => {
@@ -231,7 +259,7 @@ export default function FormCreation() {
   const AttributeItem = ({ attribute, draggable = true }: { attribute: Attribute; draggable?: boolean }) => {
     const Icon = attribute.icon;
     const dbAttribute = customAttributes.find(a => a.id === attribute.id);
-    
+
     const cardContent = (
       <div
         draggable={draggable}

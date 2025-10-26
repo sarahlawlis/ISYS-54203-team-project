@@ -1,4 +1,6 @@
 import { type User, type InsertUser, type Attribute, type InsertAttribute } from "@shared/schema";
+import * as schema from "@shared/schema";
+import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { attributes } from "@shared/schema";
@@ -10,9 +12,15 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  
+
   getAttributes(): Promise<Attribute[]>;
   createAttribute(attribute: InsertAttribute): Promise<Attribute>;
+
+  getForms(): Promise<schema.Form[]>;
+  getFormById(id: string): Promise<schema.Form | undefined>;
+  createForm(form: schema.InsertForm): Promise<schema.Form>;
+  updateForm(id: string, form: Partial<schema.InsertForm>): Promise<schema.Form>;
+  deleteForm(id: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -44,15 +52,35 @@ export class MemStorage implements IStorage {
     return result;
   }
 
-  async createAttribute(insertAttribute: InsertAttribute): Promise<Attribute> {
-    const result = await db.insert(attributes).values({
-      name: insertAttribute.name,
-      type: insertAttribute.type,
-      description: insertAttribute.description ?? null,
-      icon: insertAttribute.icon,
-    }).returning();
-    
-    return result[0];
+  async createAttribute(attribute: InsertAttribute): Promise<Attribute> {
+    const [newAttribute] = await db.insert(schema.attributes).values(attribute).returning();
+    return newAttribute;
+  }
+
+  async getForms(): Promise<schema.Form[]> {
+    return await db.select().from(schema.forms);
+  }
+
+  async getFormById(id: string): Promise<schema.Form | undefined> {
+    const [form] = await db.select().from(schema.forms).where(eq(schema.forms.id, id));
+    return form;
+  }
+
+  async createForm(form: schema.InsertForm): Promise<schema.Form> {
+    const [newForm] = await db.insert(schema.forms).values(form).returning();
+    return newForm;
+  }
+
+  async updateForm(id: string, form: Partial<schema.InsertForm>): Promise<schema.Form> {
+    const [updatedForm] = await db.update(schema.forms)
+      .set(form)
+      .where(eq(schema.forms.id, id))
+      .returning();
+    return updatedForm;
+  }
+
+  async deleteForm(id: string): Promise<void> {
+    await db.delete(schema.forms).where(eq(schema.forms.id, id));
   }
 }
 

@@ -31,3 +31,22 @@ export const insertAttributeSchema = createInsertSchema(attributes).omit({
 
 export type InsertAttribute = z.infer<typeof insertAttributeSchema>;
 export type Attribute = typeof attributes.$inferSelect;
+
+export const forms = pgTable("forms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  type: text("type").notNull().default('project'),
+  attributeCount: text("attribute_count").notNull().default('0'),
+  usageCount: text("usage_count").notNull().default('0'),
+  attributes: text("attributes").notNull().default('[]'), // JSON string of attributes
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const insertFormSchema = createInsertSchema(forms).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertForm = z.infer<typeof insertFormSchema>;
+export type Form = typeof forms.$inferSelect;

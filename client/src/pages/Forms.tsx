@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, FileText, MoreVertical } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -63,6 +64,12 @@ export default function Forms() {
   const [searchTerm, setSearchTerm] = useState("");
   const [view, setView] = useState<ViewMode>("cards");
 
+  const { data: forms = [], refetch } = useQuery({
+    queryKey: ["/api/forms"],
+    // Placeholder data for initial load, replace with actual API call
+    placeholderData: mockForms,
+  });
+
   useEffect(() => {
     const stored = localStorage.getItem("forms-view") as ViewMode | null;
     if (stored) setView(stored);
@@ -105,7 +112,7 @@ export default function Forms() {
 
         {view === "cards" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {mockForms.map((form) => (
+            {forms.map((form) => (
               <Card
                 key={form.id}
                 className="rounded-card hover-elevate"
@@ -194,7 +201,7 @@ export default function Forms() {
             ))}
           </div>
         ) : (
-          <FormsTable forms={mockForms} />
+          <FormsTable forms={forms} />
         )}
       </div>
     </div>
