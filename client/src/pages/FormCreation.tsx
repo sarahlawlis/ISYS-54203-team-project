@@ -31,6 +31,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { CreateAttributeDialog } from "@/components/CreateAttributeDialog";
 import type { Attribute as DBAttribute } from "@shared/schema";
 
@@ -226,29 +232,46 @@ export default function FormCreation() {
     const Icon = attribute.icon;
     const dbAttribute = customAttributes.find(a => a.id === attribute.id);
     
-    return (
+    const cardContent = (
       <div
         draggable={draggable}
         onDragStart={(e) => draggable && handleDragStart(e, attribute)}
-        className={`flex items-center gap-3 p-3 rounded-lg border bg-card ${
+        className={`flex items-center gap-2.5 p-2.5 rounded-lg border bg-card ${
           draggable ? "cursor-move hover-elevate active-elevate-2" : ""
         }`}
         data-testid={`attribute-${attribute.id}`}
       >
-        <div className="flex h-8 w-8 items-center justify-center rounded bg-accent flex-shrink-0">
-          <Icon className="h-4 w-4 text-accent-foreground" />
+        <div className="flex h-7 w-7 items-center justify-center rounded bg-accent flex-shrink-0">
+          <Icon className="h-3.5 w-3.5 text-accent-foreground" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{attribute.name}</p>
-          <p className="text-xs text-muted-foreground">{attribute.type}</p>
+          <p className="text-xs text-muted-foreground leading-tight">{attribute.type}</p>
           {dbAttribute?.description && (
-            <p className="text-xs text-muted-foreground mt-1 line-clamp-2" title={dbAttribute.description}>
+            <p className="text-xs text-muted-foreground leading-tight truncate mt-0.5">
               {dbAttribute.description}
             </p>
           )}
         </div>
       </div>
     );
+
+    if (dbAttribute?.description) {
+      return (
+        <TooltipProvider>
+          <Tooltip delayDuration={300}>
+            <TooltipTrigger asChild>
+              {cardContent}
+            </TooltipTrigger>
+            <TooltipContent side="right" className="max-w-xs">
+              <p className="text-sm">{dbAttribute.description}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    return cardContent;
   };
 
   const renderFieldPreview = (attr: FormAttribute) => {
