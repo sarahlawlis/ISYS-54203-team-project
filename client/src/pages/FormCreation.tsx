@@ -39,6 +39,7 @@ interface Attribute {
   name: string;
   type: string;
   icon: any;
+  description?: string;
 }
 
 interface FormAttribute extends Attribute {
@@ -223,6 +224,8 @@ export default function FormCreation() {
 
   const AttributeItem = ({ attribute, draggable = true }: { attribute: Attribute; draggable?: boolean }) => {
     const Icon = attribute.icon;
+    const dbAttribute = customAttributes.find(a => a.id === attribute.id);
+    
     return (
       <div
         draggable={draggable}
@@ -238,6 +241,11 @@ export default function FormCreation() {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{attribute.name}</p>
           <p className="text-xs text-muted-foreground">{attribute.type}</p>
+          {dbAttribute?.description && (
+            <p className="text-xs text-muted-foreground mt-1 line-clamp-2" title={dbAttribute.description}>
+              {dbAttribute.description}
+            </p>
+          )}
         </div>
       </div>
     );
@@ -322,6 +330,7 @@ export default function FormCreation() {
             </div>
             <div className="space-y-2 overflow-auto flex-1">
               {availableAttributes
+                .sort((a, b) => a.name.localeCompare(b.name))
                 .filter((attr) => 
                   attr.name.toLowerCase().includes(attributeSearch.toLowerCase()) ||
                   attr.type.toLowerCase().includes(attributeSearch.toLowerCase())
