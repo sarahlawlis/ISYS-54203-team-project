@@ -213,22 +213,29 @@ export default function FormCreation() {
 
   const handleSaveForm = async () => {
     const params = new URLSearchParams(window.location.search);
-    const formId = params.get('formId');
+    const editingFormId = params.get('formId');
 
-    // Prepare form data - exclude icon from serialization
+    if (!formName.trim()) {
+      alert('Please enter a form name');
+      return;
+    }
+
     const formData = {
       name: formName,
       description: formDescription,
-      attributes: JSON.stringify(formAttributes.map(({ icon, ...attr }) => attr)),
       attributeCount: formAttributes.length.toString(),
-      usageCount: "0",
-      type: "project",
+      attributes: JSON.stringify(formAttributes.map(attr => ({
+        ...attr,
+        visibility: attr.visibility
+      }))),
     };
 
+    console.log('Form saved:', formData);
+
     try {
-      if (formId) {
+      if (editingFormId) {
         // Update existing form
-        await fetch(`/api/forms/${formId}`, {
+        await fetch(`/api/forms/${editingFormId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData),
@@ -242,9 +249,10 @@ export default function FormCreation() {
         });
       }
 
-      setLocation("/forms");
+      setLocation('/forms');
     } catch (error) {
-      console.error("Failed to save form:", error);
+      console.error('Error saving form:', error);
+      alert('Failed to save form');
     }
   };
 
