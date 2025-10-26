@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import type { DragEvent } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,6 +87,7 @@ const getIconComponent = (iconName: string) => {
 
 export default function FormCreation() {
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   const [formName, setFormName] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formAttributes, setFormAttributes] = useState<FormAttribute[]>([]);
@@ -248,6 +249,9 @@ export default function FormCreation() {
           body: JSON.stringify(formData),
         });
       }
+
+      // Invalidate the forms cache to trigger a refetch
+      queryClient.invalidateQueries({ queryKey: ['/api/forms'] });
 
       setLocation('/forms');
     } catch (error) {
