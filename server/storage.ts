@@ -1,5 +1,7 @@
-import { type User, type InsertUser } from "@shared/schema";
+import { type User, type InsertUser, type Attribute, type InsertAttribute } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { db } from "./db";
+import { attributes } from "@shared/schema";
 
 // modify the interface with any CRUD methods
 // you might need
@@ -8,6 +10,9 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  
+  getAttributes(): Promise<Attribute[]>;
+  createAttribute(attribute: InsertAttribute): Promise<Attribute>;
 }
 
 export class MemStorage implements IStorage {
@@ -32,6 +37,22 @@ export class MemStorage implements IStorage {
     const user: User = { ...insertUser, id };
     this.users.set(id, user);
     return user;
+  }
+
+  async getAttributes(): Promise<Attribute[]> {
+    const result = await db.select().from(attributes);
+    return result;
+  }
+
+  async createAttribute(insertAttribute: InsertAttribute): Promise<Attribute> {
+    const result = await db.insert(attributes).values({
+      name: insertAttribute.name,
+      type: insertAttribute.type,
+      description: insertAttribute.description ?? null,
+      icon: insertAttribute.icon,
+    }).returning();
+    
+    return result[0];
   }
 }
 

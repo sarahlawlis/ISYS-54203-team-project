@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { DragEvent } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CreateAttributeDialog } from "@/components/CreateAttributeDialog";
+import type { Attribute as DBAttribute } from "@shared/schema";
 
 interface Attribute {
   id: string;
@@ -43,7 +46,7 @@ interface FormAttribute extends Attribute {
   visibility: 'Editable' | 'Required' | 'Read Only' | 'Hidden';
 }
 
-const allAttributes: Attribute[] = [
+const builtInAttributes: Attribute[] = [
   { id: "1", name: "Customer Name", type: "text", icon: FileText },
   { id: "2", name: "Due Date", type: "date", icon: Calendar },
   { id: "3", name: "Retailer", type: "text", icon: FileText },
@@ -59,6 +62,22 @@ const allAttributes: Attribute[] = [
   { id: "n5", name: "Long Text", type: "textarea", icon: AlignLeft },
 ];
 
+// Helper function to convert icon string to actual icon component
+const getIconComponent = (iconName: string) => {
+  const iconMap: Record<string, any> = {
+    FileText,
+    Calendar,
+    CheckSquare,
+    Upload,
+    AlignLeft,
+    Hash,
+    Mail,
+    Phone,
+    LinkIcon,
+  };
+  return iconMap[iconName] || FileText;
+};
+
 export default function FormCreation() {
   const [, setLocation] = useLocation();
   const [formName, setFormName] = useState("");
@@ -67,6 +86,23 @@ export default function FormCreation() {
   const [draggedOver, setDraggedOver] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [attributeSearch, setAttributeSearch] = useState("");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+
+  // Fetch custom attributes from database
+  const { data: customAttributes = [] } = useQuery<DBAttribute[]>({
+    queryKey: ["/api/attributes"],
+  });
+
+  // Merge built-in and custom attributes
+  const allAttributes = useMemo(() => {
+    const customAttrs: Attribute[] = customAttributes.map(attr => ({
+      id: attr.id,
+      name: attr.name,
+      type: attr.type,
+      icon: getIconComponent(attr.icon),
+    }));
+    return [...builtInAttributes, ...customAttrs];
+  }, [customAttributes]);
 
   // Load form data when editing existing form
   useEffect(() => {
@@ -297,7 +333,11 @@ export default function FormCreation() {
           </div>
 
           <div className="p-4 border-t">
-            <Button className="w-full" data-testid="button-new-attribute">
+            <Button 
+              className="w-full" 
+              onClick={() => setIsCreateDialogOpen(true)}
+              data-testid="button-new-attribute"
+            >
               <Plus className="h-4 w-4 mr-2" />
               New Attribute
             </Button>
@@ -430,6 +470,12 @@ export default function FormCreation() {
           </div>
         </div>
       </div>
+
+      {/* Create Attribute Dialog */}
+      <CreateAttributeDialog 
+        open={isCreateDialogOpen} 
+        onOpenChange={setIsCreateDialogOpen} 
+      />
     </div>
   );
 }
