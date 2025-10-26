@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 
 //todo: remove mock functionality
 const mockWorkflows = [
@@ -61,6 +62,7 @@ const mockWorkflows = [
 export default function Workflows() {
   const [searchTerm, setSearchTerm] = useState("");
   const [view, setView] = useState<ViewMode>("cards");
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     const stored = localStorage.getItem("workflows-view") as ViewMode | null;
@@ -82,7 +84,10 @@ export default function Workflows() {
               Design and manage reusable workflows
             </p>
           </div>
-          <Button data-testid="button-create-workflow">
+          <Button
+            onClick={() => setLocation("/workflows/new")}
+            data-testid="button-create-workflow"
+          >
             <Plus className="h-4 w-4 mr-2" />
             Create Workflow
           </Button>

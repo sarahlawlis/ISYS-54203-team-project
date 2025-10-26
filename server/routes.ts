@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertAttributeSchema, insertFormSchema } from "@shared/schema";
+import { insertAttributeSchema, insertFormSchema, insertWorkflowSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Attributes routes
@@ -72,6 +72,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete form" });
+    }
+  });
+
+  // Workflows routes
+  app.get("/api/workflows", async (_req, res) => {
+    try {
+      const workflows = await storage.getWorkflows();
+      res.json(workflows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch workflows" });
+    }
+  });
+
+  app.get("/api/workflows/:id", async (req, res) => {
+    try {
+      const workflow = await storage.getWorkflowById(req.params.id);
+      if (!workflow) {
+        return res.status(404).json({ error: "Workflow not found" });
+      }
+      res.json(workflow);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch workflow" });
+    }
+  });
+
+  app.post("/api/workflows", async (req, res) => {
+    try {
+      const validatedData = insertWorkflowSchema.parse(req.body);
+      const workflow = await storage.createWorkflow(validatedData);
+      res.status(201).json(workflow);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid workflow data" });
+    }
+  });
+
+  app.put("/api/workflows/:id", async (req, res) => {
+    try {
+      const validatedData = insertWorkflowSchema.partial().parse(req.body);
+      const workflow = await storage.updateWorkflow(req.params.id, validatedData);
+      res.json(workflow);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid workflow data" });
+    }
+  });
+
+  app.delete("/api/workflows/:id", async (req, res) => {
+    try {
+      await storage.deleteWorkflow(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete workflow" });
     }
   });
 

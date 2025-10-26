@@ -9,6 +9,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import Dashboard from "@/pages/Dashboard";
 import Projects from "@/pages/Projects";
 import Workflows from "@/pages/Workflows";
+import WorkflowDesigner from "@/pages/WorkflowDesigner";
 import Forms from "@/pages/Forms";
 import FormCreation from "@/pages/FormCreation";
 import Attributes from "@/pages/Attributes";
@@ -21,6 +22,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/projects" component={Projects} />
+      <Route path="/workflows/:id" component={WorkflowDesigner} />
       <Route path="/workflows" component={Workflows} />
       <Route path="/forms/new" component={FormCreation} />
       <Route path="/forms" component={Forms} />

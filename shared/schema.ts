@@ -50,3 +50,20 @@ export const insertFormSchema = createInsertSchema(forms).omit({
 
 export type InsertForm = z.infer<typeof insertFormSchema>;
 export type Form = typeof forms.$inferSelect;
+
+export const workflows = pgTable("workflows", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  nodes: text("nodes").notNull().default('[]'), // JSON string of workflow nodes
+  edges: text("edges").notNull().default('[]'), // JSON string of workflow connections
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const insertWorkflowSchema = createInsertSchema(workflows).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertWorkflow = z.infer<typeof insertWorkflowSchema>;
+export type Workflow = typeof workflows.$inferSelect;
