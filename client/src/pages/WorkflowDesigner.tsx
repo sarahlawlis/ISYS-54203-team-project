@@ -294,6 +294,21 @@ export default function WorkflowDesigner() {
         >
           {/* Edges */}
           <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 1 }}>
+            <defs>
+              <marker
+                id="arrowhead"
+                markerWidth="10"
+                markerHeight="10"
+                refX="9"
+                refY="3"
+                orient="auto"
+              >
+                <polygon
+                  points="0 0, 10 3, 0 6"
+                  fill="hsl(var(--primary))"
+                />
+              </marker>
+            </defs>
             {edges.map((edge) => {
               const sourceNode = nodes.find((n) => n.id === edge.source);
               const targetNode = nodes.find((n) => n.id === edge.target);
@@ -317,21 +332,6 @@ export default function WorkflowDesigner() {
                 />
               );
             })}
-            <defs>
-              <marker
-                id="arrowhead"
-                markerWidth="10"
-                markerHeight="10"
-                refX="9"
-                refY="3"
-                orient="auto"
-              >
-                <polygon
-                  points="0 0, 10 3, 0 6"
-                  fill="hsl(var(--primary))"
-                />
-              </marker>
-            </defs>
           </svg>
 
           {/* Nodes */}
@@ -369,11 +369,7 @@ export default function WorkflowDesigner() {
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (canConnect) {
-                    handleCompleteConnection(node.id);
-                  } else {
-                    setSelectedNode(node.id);
-                  }
+                  setSelectedNode(node.id);
                 }}
                 data-testid={`node-${node.id}`}
               >
