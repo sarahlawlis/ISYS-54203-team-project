@@ -214,34 +214,50 @@ export default function WorkflowDesigner() {
         {/* Toolbar */}
         <div className="w-64 border-r bg-card p-4 space-y-4 overflow-auto">
           <div>
-            <h3 className="font-semibold mb-2">Available Tools</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Drag items onto the canvas
+            <h3 className="font-semibold mb-2">Workflow Builder</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Drag items to canvas, then click Connect to link them together
             </p>
           </div>
 
           <div className="space-y-2">
-            <div className="font-medium text-sm">Forms</div>
-            {forms.map((form) => (
-              <div
-                key={form.id}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData("type", "form");
-                  e.dataTransfer.setData("formId", form.id);
-                  e.dataTransfer.setData("formName", form.name);
-                }}
-                className="flex items-center gap-2 p-2 rounded-md bg-background border hover-elevate cursor-move"
-                data-testid={`tool-form-${form.id}`}
-              >
-                <FileText className="h-4 w-4 text-primary" />
-                <span className="text-sm truncate">{form.name}</span>
+            <div>
+              <div className="font-medium text-sm mb-1">Forms</div>
+              <p className="text-xs text-muted-foreground mb-2">
+                Data collection points using your custom forms
+              </p>
+            </div>
+            {forms.length === 0 ? (
+              <div className="text-xs text-muted-foreground p-2 border border-dashed rounded-md">
+                No forms created yet. Create forms in the Forms tab.
               </div>
-            ))}
+            ) : (
+              forms.map((form) => (
+                <div
+                  key={form.id}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("type", "form");
+                    e.dataTransfer.setData("formId", form.id);
+                    e.dataTransfer.setData("formName", form.name);
+                  }}
+                  className="flex items-center gap-2 p-2 rounded-md bg-primary/5 border border-primary/30 hover-elevate cursor-move"
+                  data-testid={`tool-form-${form.id}`}
+                >
+                  <FileText className="h-4 w-4 text-primary flex-shrink-0" />
+                  <span className="text-sm truncate">{form.name}</span>
+                </div>
+              ))
+            )}
           </div>
 
           <div className="space-y-2">
-            <div className="font-medium text-sm">Steps</div>
+            <div>
+              <div className="font-medium text-sm mb-1">Steps</div>
+              <p className="text-xs text-muted-foreground mb-2">
+                Generic workflow steps for approvals, decisions, or actions
+              </p>
+            </div>
             <div
               draggable
               onDragStart={(e) => {
@@ -250,7 +266,7 @@ export default function WorkflowDesigner() {
               className="flex items-center gap-2 p-2 rounded-md bg-background border hover-elevate cursor-move"
               data-testid="tool-step"
             >
-              <GitBranch className="h-4 w-4 text-primary" />
+              <GitBranch className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <span className="text-sm">Generic Step</span>
             </div>
           </div>
@@ -283,10 +299,10 @@ export default function WorkflowDesigner() {
               const targetNode = nodes.find((n) => n.id === edge.target);
               if (!sourceNode || !targetNode) return null;
 
-              const sx = sourceNode.position.x + 120;
-              const sy = sourceNode.position.y + 40;
+              const sx = sourceNode.position.x + 70; // Half of 140px width
+              const sy = sourceNode.position.y + 30;
               const tx = targetNode.position.x;
-              const ty = targetNode.position.y + 40;
+              const ty = targetNode.position.y + 30;
 
               const midX = (sx + tx) / 2;
 
@@ -319,79 +335,107 @@ export default function WorkflowDesigner() {
           </svg>
 
           {/* Nodes */}
-          {nodes.map((node) => (
-            <div
-              key={node.id}
-              className={`absolute bg-card border-2 rounded-[1.3rem] shadow-lg ${
-                selectedNode === node.id ? "border-primary" : "border-border"
-              } ${connectingFrom === node.id ? "ring-2 ring-primary" : ""}`}
-              style={{
-                left: node.position.x,
-                top: node.position.y,
-                width: "240px",
-                zIndex: draggedNode === node.id ? 10 : 2,
-                cursor: draggedNode === node.id ? "grabbing" : "grab",
-              }}
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                handleDragStart(node.id, e);
-                setSelectedNode(node.id);
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedNode(node.id);
-              }}
-              data-testid={`node-${node.id}`}
-            >
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  {node.type === "form" ? (
-                    <FileText className="h-4 w-4 text-primary" />
-                  ) : (
-                    <GitBranch className="h-4 w-4 text-primary" />
-                  )}
-                  <span className="font-medium text-sm truncate">
-                    {node.data.label}
-                  </span>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {node.type === "form" ? "Form" : "Step"}
-                </div>
+          {nodes.map((node) => {
+            const isForm = node.type === "form";
+            const isConnecting = connectingFrom !== null;
+            const isSource = connectingFrom === node.id;
+            const canConnect = isConnecting && !isSource;
+            
+            return (
+              <div
+                key={node.id}
+                className={`absolute border-2 rounded-lg shadow-md transition-all ${
+                  isForm 
+                    ? "bg-primary/5 border-primary/30" 
+                    : "bg-card border-border"
+                } ${
+                  selectedNode === node.id ? "!border-primary ring-2 ring-primary/20" : ""
+                } ${
+                  isSource ? "ring-2 ring-primary scale-105" : ""
+                } ${
+                  canConnect ? "ring-2 ring-accent hover-elevate" : ""
+                }`}
+                style={{
+                  left: node.position.x,
+                  top: node.position.y,
+                  width: "140px",
+                  zIndex: draggedNode === node.id ? 10 : 2,
+                  cursor: draggedNode === node.id ? "grabbing" : "grab",
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  handleDragStart(node.id, e);
+                  setSelectedNode(node.id);
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (canConnect) {
+                    handleCompleteConnection(node.id);
+                  } else {
+                    setSelectedNode(node.id);
+                  }
+                }}
+                data-testid={`node-${node.id}`}
+              >
+                <div className="p-2">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    {isForm ? (
+                      <div className="h-5 w-5 rounded bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <FileText className="h-3 w-3 text-primary" />
+                      </div>
+                    ) : (
+                      <div className="h-5 w-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                        <GitBranch className="h-3 w-3 text-muted-foreground" />
+                      </div>
+                    )}
+                    <span className="font-medium text-xs truncate">
+                      {node.data.label}
+                    </span>
+                  </div>
+                  
+                  <div className="text-[10px] text-muted-foreground mb-2">
+                    {isForm ? "Data Collection" : "Process Step"}
+                  </div>
 
-                {/* Connection ports */}
-                <div className="flex justify-between mt-3 gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (connectingFrom) {
-                        handleCompleteConnection(node.id);
-                      } else {
-                        handleStartConnection(node.id);
-                      }
-                    }}
-                    className="text-xs h-7"
-                    data-testid={`button-connect-${node.id}`}
-                  >
-                    {connectingFrom === node.id ? "Cancel" : "Connect"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteNode(node.id);
-                    }}
-                    className="text-xs h-7"
-                    data-testid={`button-delete-${node.id}`}
-                  >
-                    Delete
-                  </Button>
+                  {/* Connection ports */}
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant={isSource ? "default" : "outline"}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isConnecting) {
+                          if (isSource) {
+                            setConnectingFrom(null);
+                          } else {
+                            handleCompleteConnection(node.id);
+                          }
+                        } else {
+                          handleStartConnection(node.id);
+                        }
+                      }}
+                      className="text-xs h-6 flex-1 px-1"
+                      data-testid={`button-connect-${node.id}`}
+                    >
+                      {isSource ? "Cancel" : canConnect ? "Set Target" : "Connect"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteNode(node.id);
+                      }}
+                      className="text-xs h-6 px-1"
+                      data-testid={`button-delete-${node.id}`}
+                    >
+                      Del
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {nodes.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center">
