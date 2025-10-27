@@ -3,10 +3,12 @@ import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Save, FileText, GitBranch } from "lucide-react";
+import { ArrowLeft, Save, FileText, GitBranch, ThumbsUp, ClipboardCheck, PenTool, Bell, UserPlus, Clock, GitMerge } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Workflow, Form } from "@shared/schema";
+
+type StepType = "approval" | "review" | "signature" | "notification" | "assignment" | "delay" | "condition" | "generic";
 
 interface WorkflowNode {
   id: string;
@@ -15,6 +17,7 @@ interface WorkflowNode {
   data: {
     label: string;
     formId?: string;
+    stepType?: StepType;
   };
 }
 
@@ -136,7 +139,8 @@ export default function WorkflowDesigner() {
     e: React.DragEvent,
     type: "form" | "step",
     formId?: string,
-    formName?: string
+    formName?: string,
+    stepType?: StepType
   ) => {
     e.preventDefault();
     if (!canvasRef.current) return;
@@ -152,6 +156,7 @@ export default function WorkflowDesigner() {
       data: {
         label: formName || (type === "form" ? "Form" : "Step"),
         formId,
+        stepType: type === "step" ? (stepType || "generic") : undefined,
       },
     };
 
@@ -184,6 +189,23 @@ export default function WorkflowDesigner() {
 
   // Use a compact fixed size for all nodes to prevent layout jumpiness
   const nodeWidth = 100;
+
+  // Define step types with their icons and labels
+  const stepTypes: Array<{ type: StepType; label: string; icon: typeof ThumbsUp }> = [
+    { type: "approval", label: "Approval", icon: ThumbsUp },
+    { type: "review", label: "Review", icon: ClipboardCheck },
+    { type: "signature", label: "Signature", icon: PenTool },
+    { type: "notification", label: "Notification", icon: Bell },
+    { type: "assignment", label: "Assignment", icon: UserPlus },
+    { type: "delay", label: "Delay", icon: Clock },
+    { type: "condition", label: "Condition", icon: GitMerge },
+    { type: "generic", label: "Generic Step", icon: GitBranch },
+  ];
+
+  // Helper to get step type info
+  const getStepTypeInfo = (stepType?: StepType) => {
+    return stepTypes.find((st) => st.type === stepType) || stepTypes[7]; // default to generic
+  };
 
   return (
     <div className="h-full flex flex-col">
@@ -250,16 +272,26 @@ export default function WorkflowDesigner() {
 
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">Steps:</span>
-            <div
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData("type", "step");
-              }}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-background border hover-elevate cursor-move"
-              data-testid="tool-step"
-            >
-              <GitBranch className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-              <span className="text-xs">Generic Step</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              {stepTypes.map((stepType) => {
+                const Icon = stepType.icon;
+                return (
+                  <div
+                    key={stepType.type}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("type", "step");
+                      e.dataTransfer.setData("stepType", stepType.type);
+                      e.dataTransfer.setData("stepLabel", stepType.label);
+                    }}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-background border hover-elevate cursor-move"
+                    data-testid={`tool-step-${stepType.type}`}
+                  >
+                    <Icon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                    <span className="text-xs">{stepType.label}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -287,7 +319,9 @@ export default function WorkflowDesigner() {
             const type = e.dataTransfer.getData("type") as "form" | "step";
             const formId = e.dataTransfer.getData("formId");
             const formName = e.dataTransfer.getData("formName");
-            handleToolDrop(e, type, formId, formName);
+            const stepType = e.dataTransfer.getData("stepType") as StepType;
+            const stepLabel = e.dataTransfer.getData("stepLabel");
+            handleToolDrop(e, type, formId, formName || stepLabel, stepType);
           }}
           onMouseMove={handleDragMove}
           onMouseUp={handleDragEnd}
@@ -343,6 +377,8 @@ export default function WorkflowDesigner() {
             const isConnecting = connectingFrom !== null;
             const isSource = connectingFrom === node.id;
             const canConnect = isConnecting && !isSource;
+            const stepTypeInfo = !isForm ? getStepTypeInfo(node.data.stepType) : null;
+            const StepIcon = stepTypeInfo?.icon;
             
             return (
               <div
@@ -383,18 +419,18 @@ export default function WorkflowDesigner() {
                       <div className="h-4 w-4 rounded bg-primary/10 flex items-center justify-center flex-shrink-0">
                         <FileText className="h-2.5 w-2.5 text-primary" />
                       </div>
-                    ) : (
+                    ) : StepIcon ? (
                       <div className="h-4 w-4 rounded bg-muted flex items-center justify-center flex-shrink-0">
-                        <GitBranch className="h-2.5 w-2.5 text-muted-foreground" />
+                        <StepIcon className="h-2.5 w-2.5 text-muted-foreground" />
                       </div>
-                    )}
+                    ) : null}
                     <span className="font-medium text-[10px] truncate">
                       {node.data.label}
                     </span>
                   </div>
                   
                   <div className="text-[9px] text-muted-foreground mb-1">
-                    {isForm ? "Data Collection" : "Process Step"}
+                    {isForm ? "Data Collection" : stepTypeInfo?.label || "Process Step"}
                   </div>
 
                   {/* Connection ports */}
