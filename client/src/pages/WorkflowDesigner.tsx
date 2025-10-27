@@ -181,6 +181,16 @@ export default function WorkflowDesigner() {
     setSelectedNode(null);
   };
 
+  // Dynamic node scaling - smaller as more nodes are added
+  const getNodeSize = () => {
+    const baseWidth = 140;
+    const minWidth = 80;
+    const scaleFactor = Math.max(0.5, 1 - (nodes.length * 0.03));
+    return Math.max(minWidth, baseWidth * scaleFactor);
+  };
+
+  const nodeWidth = getNodeSize();
+
   return (
     <Xwrapper>
     <div className="h-full flex flex-col">
@@ -212,67 +222,63 @@ export default function WorkflowDesigner() {
         </Button>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Toolbar */}
-        <div className="w-64 border-r bg-card p-4 space-y-4 overflow-auto">
-          <div>
-            <h3 className="font-semibold mb-2">Workflow Builder</h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              Drag items to canvas, then click Connect to link them together
-            </p>
+      {/* Horizontal Toolbar */}
+      <div className="border-b bg-card p-3">
+        <div className="flex items-center gap-6 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">Forms:</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              {forms.length === 0 ? (
+                <span className="text-xs text-muted-foreground">
+                  No forms created yet
+                </span>
+              ) : (
+                forms.map((form) => (
+                  <div
+                    key={form.id}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("type", "form");
+                      e.dataTransfer.setData("formId", form.id);
+                      e.dataTransfer.setData("formName", form.name);
+                    }}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/5 border border-primary/30 hover-elevate cursor-move"
+                    data-testid={`tool-form-${form.id}`}
+                  >
+                    <FileText className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                    <span className="text-xs truncate max-w-[120px]">{form.name}</span>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <div>
-              <div className="font-medium text-sm mb-1">Forms</div>
-              <p className="text-xs text-muted-foreground mb-2">
-                Data collection points using your custom forms
-              </p>
-            </div>
-            {forms.length === 0 ? (
-              <div className="text-xs text-muted-foreground p-2 border border-dashed rounded-md">
-                No forms created yet. Create forms in the Forms tab.
-              </div>
-            ) : (
-              forms.map((form) => (
-                <div
-                  key={form.id}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData("type", "form");
-                    e.dataTransfer.setData("formId", form.id);
-                    e.dataTransfer.setData("formName", form.name);
-                  }}
-                  className="flex items-center gap-2 p-2 rounded-md bg-primary/5 border border-primary/30 hover-elevate cursor-move"
-                  data-testid={`tool-form-${form.id}`}
-                >
-                  <FileText className="h-4 w-4 text-primary flex-shrink-0" />
-                  <span className="text-sm truncate">{form.name}</span>
-                </div>
-              ))
-            )}
-          </div>
+          <div className="h-6 w-px bg-border" />
 
-          <div className="space-y-2">
-            <div>
-              <div className="font-medium text-sm mb-1">Steps</div>
-              <p className="text-xs text-muted-foreground mb-2">
-                Generic workflow steps for approvals, decisions, or actions
-              </p>
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">Steps:</span>
             <div
               draggable
               onDragStart={(e) => {
                 e.dataTransfer.setData("type", "step");
               }}
-              className="flex items-center gap-2 p-2 rounded-md bg-background border hover-elevate cursor-move"
+              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-background border hover-elevate cursor-move"
               data-testid="tool-step"
             >
-              <GitBranch className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <span className="text-sm">Generic Step</span>
+              <GitBranch className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+              <span className="text-xs">Generic Step</span>
             </div>
           </div>
+
+          <div className="h-6 w-px bg-border" />
+
+          <div className="text-xs text-muted-foreground">
+            Drag items to canvas, then click Connect to link them
+          </div>
         </div>
+      </div>
+
+      <div className="flex flex-1 overflow-hidden">
 
         {/* Canvas */}
         <div
@@ -334,7 +340,7 @@ export default function WorkflowDesigner() {
                 style={{
                   left: node.position.x,
                   top: node.position.y,
-                  width: "140px",
+                  width: `${nodeWidth}px`,
                   zIndex: draggedNode === node.id ? 10 : 2,
                   cursor: draggedNode === node.id ? "grabbing" : "grab",
                 }}
@@ -349,28 +355,28 @@ export default function WorkflowDesigner() {
                 }}
                 data-testid={`node-${node.id}`}
               >
-                <div className="p-2">
-                  <div className="flex items-center gap-1.5 mb-1">
+                <div className="p-1.5">
+                  <div className="flex items-center gap-1 mb-0.5">
                     {isForm ? (
-                      <div className="h-5 w-5 rounded bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <FileText className="h-3 w-3 text-primary" />
+                      <div className="h-4 w-4 rounded bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <FileText className="h-2.5 w-2.5 text-primary" />
                       </div>
                     ) : (
-                      <div className="h-5 w-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
-                        <GitBranch className="h-3 w-3 text-muted-foreground" />
+                      <div className="h-4 w-4 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                        <GitBranch className="h-2.5 w-2.5 text-muted-foreground" />
                       </div>
                     )}
-                    <span className="font-medium text-xs truncate">
+                    <span className="font-medium text-[10px] truncate">
                       {node.data.label}
                     </span>
                   </div>
                   
-                  <div className="text-[10px] text-muted-foreground mb-2">
+                  <div className="text-[9px] text-muted-foreground mb-1">
                     {isForm ? "Data Collection" : "Process Step"}
                   </div>
 
                   {/* Connection ports */}
-                  <div className="flex gap-1">
+                  <div className="flex gap-0.5">
                     <Button
                       size="sm"
                       variant={isSource ? "default" : "outline"}
@@ -386,10 +392,10 @@ export default function WorkflowDesigner() {
                           handleStartConnection(node.id);
                         }
                       }}
-                      className="text-xs h-6 flex-1 px-1"
+                      className="text-[9px] h-5 flex-1 px-1"
                       data-testid={`button-connect-${node.id}`}
                     >
-                      {isSource ? "Cancel" : canConnect ? "Set Target" : "Connect"}
+                      {isSource ? "Cancel" : canConnect ? "Target" : "Connect"}
                     </Button>
                     <Button
                       size="sm"
@@ -398,7 +404,7 @@ export default function WorkflowDesigner() {
                         e.stopPropagation();
                         handleDeleteNode(node.id);
                       }}
-                      className="text-xs h-6 px-1"
+                      className="text-[9px] h-5 px-1"
                       data-testid={`button-delete-${node.id}`}
                     >
                       Del
