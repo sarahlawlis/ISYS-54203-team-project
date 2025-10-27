@@ -16,12 +16,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useLocation } from "wouter";
 
 interface WorkflowsTableProps {
   workflows: WorkflowCardProps[];
 }
 
 export function WorkflowsTable({ workflows }: WorkflowsTableProps) {
+  const [, setLocation] = useLocation();
+
   return (
     <div className="border rounded-card overflow-hidden">
       <Table>
@@ -62,7 +65,10 @@ export function WorkflowsTable({ workflows }: WorkflowsTableProps) {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem data-testid={`button-edit-workflow-${workflow.id}`}>
+                      <DropdownMenuItem 
+                        onClick={() => setLocation(`/workflows/${workflow.id}`)}
+                        data-testid={`button-edit-workflow-${workflow.id}`}
+                      >
                         Edit
                       </DropdownMenuItem>
                       <DropdownMenuItem data-testid={`button-duplicate-workflow-${workflow.id}`}>

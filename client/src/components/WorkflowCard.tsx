@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useLocation } from "wouter";
 
 export interface WorkflowCardProps {
   id: string;
@@ -26,6 +27,8 @@ export function WorkflowCard({
   usageCount,
   category,
 }: WorkflowCardProps) {
+  const [, setLocation] = useLocation();
+
   return (
     <Card className="rounded-card hover-elevate" data-testid={`card-workflow-${id}`}>
       <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-3">
@@ -49,7 +52,10 @@ export function WorkflowCard({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem data-testid={`button-edit-workflow-${id}`}>
+            <DropdownMenuItem 
+              onClick={() => setLocation(`/workflows/${id}`)}
+              data-testid={`button-edit-workflow-${id}`}
+            >
               Edit Workflow
             </DropdownMenuItem>
             <DropdownMenuItem data-testid={`button-duplicate-workflow-${id}`}>
