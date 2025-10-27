@@ -96,27 +96,29 @@ export default function WorkflowDesigner() {
 
   const handleDragStart = (nodeId: string, e: React.MouseEvent) => {
     const node = nodes.find((n) => n.id === nodeId);
-    if (!node) return;
+    if (!node || !canvasRef.current) return;
 
+    const rect = canvasRef.current.getBoundingClientRect();
     setDraggedNode(nodeId);
     setDragOffset({
-      x: e.clientX - node.position.x,
-      y: e.clientY - node.position.y,
+      x: e.clientX - rect.left - node.position.x,
+      y: e.clientY - rect.top - node.position.y,
     });
   };
 
   const handleDragMove = useCallback(
     (e: React.MouseEvent) => {
-      if (!draggedNode) return;
+      if (!draggedNode || !canvasRef.current) return;
 
+      const rect = canvasRef.current.getBoundingClientRect();
       setNodes((prevNodes) =>
         prevNodes.map((node) =>
           node.id === draggedNode
             ? {
                 ...node,
                 position: {
-                  x: e.clientX - dragOffset.x,
-                  y: e.clientY - dragOffset.y,
+                  x: e.clientX - rect.left - dragOffset.x,
+                  y: e.clientY - rect.top - dragOffset.y,
                 },
               }
             : node
