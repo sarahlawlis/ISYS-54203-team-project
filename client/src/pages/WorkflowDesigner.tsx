@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { ArrowLeft, Save, FileText, GitBranch } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import Xarrow, { useXarrow, Xwrapper } from "react-xarrows";
 import type { Workflow, Form } from "@shared/schema";
 
 interface WorkflowNode {
@@ -185,7 +184,6 @@ export default function WorkflowDesigner() {
   const nodeWidth = 100;
 
   return (
-    <Xwrapper>
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between gap-4 p-4 border-b flex-wrap">
@@ -293,20 +291,49 @@ export default function WorkflowDesigner() {
           onMouseUp={handleDragEnd}
           data-testid="workflow-canvas"
         >
-          {/* Edges using react-xarrows */}
-          {edges.map((edge) => (
-            <Xarrow
-              key={edge.id}
-              start={edge.source}
-              end={edge.target}
-              color="hsl(var(--primary))"
-              strokeWidth={2}
-              headSize={6}
-              showHead={true}
-              path="smooth"
-              curveness={0.6}
-            />
-          ))}
+          {/* Simple SVG arrows - stable positioning */}
+          <svg 
+            className="absolute inset-0 pointer-events-none" 
+            style={{ zIndex: 1, width: '100%', height: '100%' }}
+          >
+            <defs>
+              <marker
+                id="arrow"
+                viewBox="0 0 10 10"
+                refX="9"
+                refY="5"
+                markerWidth="6"
+                markerHeight="6"
+                orient="auto"
+              >
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="hsl(var(--primary))" />
+              </marker>
+            </defs>
+            {edges.map((edge) => {
+              const sourceNode = nodes.find((n) => n.id === edge.source);
+              const targetNode = nodes.find((n) => n.id === edge.target);
+              if (!sourceNode || !targetNode) return null;
+
+              // Calculate connection points (center-right of source to center-left of target)
+              const startX = sourceNode.position.x + nodeWidth;
+              const startY = sourceNode.position.y + 20; // Approximate center height
+              const endX = targetNode.position.x;
+              const endY = targetNode.position.y + 20;
+
+              return (
+                <line
+                  key={edge.id}
+                  x1={startX}
+                  y1={startY}
+                  x2={endX}
+                  y2={endY}
+                  stroke="hsl(var(--primary))"
+                  strokeWidth="2"
+                  markerEnd="url(#arrow)"
+                />
+              );
+            })}
+          </svg>
 
           {/* Nodes */}
           {nodes.map((node) => {
@@ -422,6 +449,5 @@ export default function WorkflowDesigner() {
         </div>
       </div>
     </div>
-    </Xwrapper>
   );
 }
