@@ -33,10 +33,6 @@ localPort = 37557
 externalPort = 5173
 
 [[ports]]
-localPort = 41907
-externalPort = 5000
-
-[[ports]]
 localPort = 62986
 externalPort = 3000
 exposeLocalhost = true
