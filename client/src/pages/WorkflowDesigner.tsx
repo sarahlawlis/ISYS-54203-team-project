@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { ArrowLeft, Save, FileText, GitBranch } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import Xarrow, { useXarrow, Xwrapper } from "react-xarrows";
 import type { Workflow, Form } from "@shared/schema";
 
 interface WorkflowNode {
@@ -181,6 +182,7 @@ export default function WorkflowDesigner() {
   };
 
   return (
+    <Xwrapper>
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between gap-4 p-4 border-b flex-wrap">
@@ -292,47 +294,20 @@ export default function WorkflowDesigner() {
           onMouseUp={handleDragEnd}
           data-testid="workflow-canvas"
         >
-          {/* Edges */}
-          <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 1 }}>
-            <defs>
-              <marker
-                id="arrowhead"
-                markerWidth="10"
-                markerHeight="10"
-                refX="9"
-                refY="3"
-                orient="auto"
-              >
-                <polygon
-                  points="0 0, 10 3, 0 6"
-                  fill="hsl(var(--primary))"
-                />
-              </marker>
-            </defs>
-            {edges.map((edge) => {
-              const sourceNode = nodes.find((n) => n.id === edge.source);
-              const targetNode = nodes.find((n) => n.id === edge.target);
-              if (!sourceNode || !targetNode) return null;
-
-              const sx = sourceNode.position.x + 70; // Half of 140px width
-              const sy = sourceNode.position.y + 30;
-              const tx = targetNode.position.x;
-              const ty = targetNode.position.y + 30;
-
-              const midX = (sx + tx) / 2;
-
-              return (
-                <path
-                  key={edge.id}
-                  d={`M ${sx} ${sy} C ${midX} ${sy}, ${midX} ${ty}, ${tx} ${ty}`}
-                  stroke="hsl(var(--primary))"
-                  strokeWidth="2"
-                  fill="none"
-                  markerEnd="url(#arrowhead)"
-                />
-              );
-            })}
-          </svg>
+          {/* Edges using react-xarrows */}
+          {edges.map((edge) => (
+            <Xarrow
+              key={edge.id}
+              start={edge.source}
+              end={edge.target}
+              color="hsl(var(--primary))"
+              strokeWidth={2}
+              headSize={6}
+              showHead={true}
+              path="smooth"
+              curveness={0.6}
+            />
+          ))}
 
           {/* Nodes */}
           {nodes.map((node) => {
@@ -344,6 +319,7 @@ export default function WorkflowDesigner() {
             return (
               <div
                 key={node.id}
+                id={node.id}
                 className={`absolute border-2 rounded-lg shadow-md transition-all ${
                   isForm 
                     ? "bg-primary/5 border-primary/30" 
@@ -447,5 +423,6 @@ export default function WorkflowDesigner() {
         </div>
       </div>
     </div>
+    </Xwrapper>
   );
 }
