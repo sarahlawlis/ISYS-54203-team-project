@@ -353,11 +353,11 @@ export default function WorkflowDesigner() {
                     ? "bg-primary/5 border-primary/30" 
                     : "bg-card border-border"
                 } ${
-                  selectedNode === node.id ? "!border-primary ring-2 ring-primary/20" : ""
+                  selectedNode === node.id ? "!border-primary" : ""
                 } ${
-                  isSource ? "ring-2 ring-primary scale-105" : ""
+                  isSource ? "!border-primary !border-4" : ""
                 } ${
-                  canConnect ? "ring-2 ring-accent hover-elevate" : ""
+                  canConnect ? "!border-accent !border-4" : ""
                 }`}
                 style={{
                   left: node.position.x,
