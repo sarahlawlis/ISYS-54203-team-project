@@ -1,9 +1,9 @@
-import { type User, type InsertUser, type Attribute, type InsertAttribute, type Workflow, type InsertWorkflow } from "@shared/schema";
+import { type User, type InsertUser, type Attribute, type InsertAttribute, type Workflow, type InsertWorkflow, type Project, type InsertProject, type ProjectForm, type InsertProjectForm, type ProjectWorkflow, type InsertProjectWorkflow, type FormSubmission, type InsertFormSubmission } from "@shared/schema";
 import * as schema from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql as drizzleSql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { attributes, workflows } from "@shared/schema";
+import { attributes, workflows, projects, projectForms, projectWorkflows, formSubmissions } from "@shared/schema";
 
 // modify the interface with any CRUD methods
 // you might need
@@ -27,6 +27,24 @@ export interface IStorage {
   createWorkflow(workflow: InsertWorkflow): Promise<Workflow>;
   updateWorkflow(id: string, workflow: Partial<InsertWorkflow>): Promise<Workflow>;
   deleteWorkflow(id: string): Promise<void>;
+
+  getProjects(): Promise<Project[]>;
+  getProjectById(id: string): Promise<Project | undefined>;
+  createProject(project: InsertProject): Promise<Project>;
+  updateProject(id: string, project: Partial<InsertProject>): Promise<Project>;
+  deleteProject(id: string): Promise<void>;
+
+  getProjectForms(projectId: string): Promise<ProjectForm[]>;
+  addProjectForm(projectForm: InsertProjectForm): Promise<ProjectForm>;
+  removeProjectForm(projectId: string, formId: string): Promise<void>;
+
+  getProjectWorkflows(projectId: string): Promise<ProjectWorkflow[]>;
+  addProjectWorkflow(projectWorkflow: InsertProjectWorkflow): Promise<ProjectWorkflow>;
+  updateProjectWorkflow(id: string, projectWorkflow: Partial<InsertProjectWorkflow>): Promise<ProjectWorkflow>;
+  removeProjectWorkflow(id: string): Promise<void>;
+
+  getFormSubmissions(projectId?: string): Promise<FormSubmission[]>;
+  createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission>;
 }
 
 export class MemStorage implements IStorage {
@@ -113,6 +131,85 @@ export class MemStorage implements IStorage {
 
   async deleteWorkflow(id: string): Promise<void> {
     await db.delete(workflows).where(eq(workflows.id, id));
+  }
+
+  async getProjects(): Promise<Project[]> {
+    return await db.select().from(projects);
+  }
+
+  async getProjectById(id: string): Promise<Project | undefined> {
+    const [project] = await db.select().from(projects).where(eq(projects.id, id));
+    return project;
+  }
+
+  async createProject(project: InsertProject): Promise<Project> {
+    const [newProject] = await db.insert(projects).values(project).returning();
+    return newProject;
+  }
+
+  async updateProject(id: string, project: Partial<InsertProject>): Promise<Project> {
+    const [updatedProject] = await db.update(projects)
+      .set({
+        ...project,
+        updatedAt: drizzleSql`CURRENT_TIMESTAMP`,
+      })
+      .where(eq(projects.id, id))
+      .returning();
+    return updatedProject;
+  }
+
+  async deleteProject(id: string): Promise<void> {
+    await db.delete(projectForms).where(eq(projectForms.projectId, id));
+    await db.delete(projectWorkflows).where(eq(projectWorkflows.projectId, id));
+    await db.delete(formSubmissions).where(eq(formSubmissions.projectId, id));
+    await db.delete(projects).where(eq(projects.id, id));
+  }
+
+  async getProjectForms(projectId: string): Promise<ProjectForm[]> {
+    return await db.select().from(projectForms).where(eq(projectForms.projectId, projectId));
+  }
+
+  async addProjectForm(projectForm: InsertProjectForm): Promise<ProjectForm> {
+    const [newProjectForm] = await db.insert(projectForms).values(projectForm).returning();
+    return newProjectForm;
+  }
+
+  async removeProjectForm(projectId: string, formId: string): Promise<void> {
+    await db.delete(projectForms)
+      .where(drizzleSql`${projectForms.projectId} = ${projectId} AND ${projectForms.formId} = ${formId}`);
+  }
+
+  async getProjectWorkflows(projectId: string): Promise<ProjectWorkflow[]> {
+    return await db.select().from(projectWorkflows).where(eq(projectWorkflows.projectId, projectId));
+  }
+
+  async addProjectWorkflow(projectWorkflow: InsertProjectWorkflow): Promise<ProjectWorkflow> {
+    const [newProjectWorkflow] = await db.insert(projectWorkflows).values(projectWorkflow).returning();
+    return newProjectWorkflow;
+  }
+
+  async updateProjectWorkflow(id: string, projectWorkflow: Partial<InsertProjectWorkflow>): Promise<ProjectWorkflow> {
+    const [updatedProjectWorkflow] = await db.update(projectWorkflows)
+      .set(projectWorkflow)
+      .where(eq(projectWorkflows.id, id))
+      .returning();
+    return updatedProjectWorkflow;
+  }
+
+  async removeProjectWorkflow(id: string): Promise<void> {
+    await db.delete(projectWorkflows).where(eq(projectWorkflows.id, id));
+  }
+
+  async getFormSubmissions(projectId?: string): Promise<FormSubmission[]> {
+    if (projectId) {
+      return await db.select().from(formSubmissions).where(eq(formSubmissions.projectId, projectId));
+    }
+    return await db.select().from(formSubmissions);
+  }
+
+  async createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission> {
+    const [newSubmission] = await db.insert(formSubmissions).values(submission).returning();
+    return newSubmission;
   }
 }
 
