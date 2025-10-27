@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -181,15 +181,8 @@ export default function WorkflowDesigner() {
     setSelectedNode(null);
   };
 
-  // Dynamic node scaling - smaller as more nodes are added
-  const getNodeSize = () => {
-    const baseWidth = 140;
-    const minWidth = 80;
-    const scaleFactor = Math.max(0.5, 1 - (nodes.length * 0.03));
-    return Math.max(minWidth, baseWidth * scaleFactor);
-  };
-
-  const nodeWidth = getNodeSize();
+  // Use a compact fixed size for all nodes to prevent layout jumpiness
+  const nodeWidth = 100;
 
   return (
     <Xwrapper>
@@ -326,7 +319,7 @@ export default function WorkflowDesigner() {
               <div
                 key={node.id}
                 id={node.id}
-                className={`absolute border-2 rounded-lg shadow-md transition-all ${
+                className={`absolute border-2 rounded-lg shadow-md ${
                   isForm 
                     ? "bg-primary/5 border-primary/30" 
                     : "bg-card border-border"
