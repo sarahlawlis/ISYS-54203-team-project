@@ -14,7 +14,9 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
 
   getAttributes(): Promise<Attribute[]>;
+  getAttributeById(id: string): Promise<Attribute | undefined>;
   createAttribute(attribute: InsertAttribute): Promise<Attribute>;
+  updateAttribute(id: string, attribute: InsertAttribute): Promise<Attribute | undefined>;
 
   getForms(): Promise<schema.Form[]>;
   getFormById(id: string): Promise<schema.Form | undefined>;
@@ -72,13 +74,26 @@ export class MemStorage implements IStorage {
   }
 
   async getAttributes(): Promise<Attribute[]> {
-    const result = await db.select().from(attributes);
-    return result;
+    return await db.select().from(attributes);
   }
 
-  async createAttribute(attribute: InsertAttribute): Promise<Attribute> {
-    const [newAttribute] = await db.insert(schema.attributes).values(attribute).returning();
+  async getAttributeById(id: string): Promise<Attribute | undefined> {
+    const result = await db.select().from(attributes).where(eq(attributes.id, id));
+    return result[0];
+  }
+
+  async createAttribute(data: InsertAttribute): Promise<Attribute> {
+    const [newAttribute] = await db.insert(schema.attributes).values(data).returning();
     return newAttribute;
+  }
+
+  async updateAttribute(id: string, data: InsertAttribute): Promise<Attribute | undefined> {
+    const result = await db
+      .update(attributes)
+      .set(data)
+      .where(eq(attributes.id, id))
+      .returning();
+    return result[0];
   }
 
   async getForms(): Promise<schema.Form[]> {

@@ -8,12 +8,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useState } from "react";
+import { CreateAttributeDialog } from "./CreateAttributeDialog";
 
 export interface AttributeCardProps {
   id: string;
   name: string;
   type: "text" | "number" | "date" | "boolean";
   usageCount: number;
+  onEdit: (id: string) => void;
 }
 
 const typeIcons = {
@@ -30,10 +33,12 @@ const typeColors = {
   boolean: "bg-chart-4 text-white",
 };
 
-export function AttributeCard({ id, name, type, usageCount }: AttributeCardProps) {
-  const Icon = typeIcons[type];
+export function AttributeCard({ id, name, type, usageCount, onEdit }: AttributeCardProps) {
+  const Icon = typeIcons[type] || Type;
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   return (
+    <>
     <Card className="rounded-card hover-elevate" data-testid={`card-attribute-${id}`}>
       <CardContent className="flex items-center justify-between gap-3 p-4">
         <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -60,7 +65,7 @@ export function AttributeCard({ id, name, type, usageCount }: AttributeCardProps
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem data-testid={`button-edit-attribute-${id}`}>
+              <DropdownMenuItem data-testid={`button-edit-attribute-${id}`} onClick={() => onEdit(id)}>
                 Edit
               </DropdownMenuItem>
               <DropdownMenuItem className="text-destructive" data-testid={`button-delete-attribute-${id}`}>
@@ -71,5 +76,11 @@ export function AttributeCard({ id, name, type, usageCount }: AttributeCardProps
         </div>
       </CardContent>
     </Card>
+    <CreateAttributeDialog
+        isOpen={isEditDialogOpen}
+        onClose={() => setIsEditDialogOpen(false)}
+        attributeId={id}
+      />
+    </>
   );
 }

@@ -16,6 +16,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useState } from "react";
+import { CreateAttributeDialog } from "./CreateAttributeDialog";
 
 const typeIcons = {
   text: Type,
@@ -29,7 +31,10 @@ interface AttributesTableProps {
 }
 
 export function AttributesTable({ attributes }: AttributesTableProps) {
+  const [editingAttributeId, setEditingAttributeId] = useState<string | null>(null);
+
   return (
+    <>
     <div className="border rounded-card overflow-hidden">
       <Table>
         <TableHeader>
@@ -65,7 +70,10 @@ export function AttributesTable({ attributes }: AttributesTableProps) {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem data-testid={`button-edit-attribute-${attr.id}`}>
+                      <DropdownMenuItem 
+                        data-testid={`button-edit-attribute-${attr.id}`}
+                        onClick={() => setEditingAttributeId(attr.id)}
+                      >
                         Edit
                       </DropdownMenuItem>
                       <DropdownMenuItem className="text-destructive" data-testid={`button-delete-attribute-${attr.id}`}>
@@ -80,5 +88,14 @@ export function AttributesTable({ attributes }: AttributesTableProps) {
         </TableBody>
       </Table>
     </div>
+    
+    {editingAttributeId && (
+      <CreateAttributeDialog 
+        open={!!editingAttributeId} 
+        onOpenChange={(open) => !open && setEditingAttributeId(null)}
+        editAttributeId={editingAttributeId}
+      />
+    )}
+    </>
   );
 }
