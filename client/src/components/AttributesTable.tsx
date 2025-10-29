@@ -9,7 +9,18 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AttributeCardProps } from "./AttributeCard";
-import { Type, Calendar, CheckSquare, Hash, MoreVertical } from "lucide-react";
+import { 
+  FileText, 
+  Calendar, 
+  CheckSquare, 
+  Upload, 
+  AlignLeft,
+  Hash,
+  Mail,
+  Phone,
+  Link as LinkIcon,
+  MoreVertical
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,11 +30,17 @@ import {
 import { useState } from "react";
 import { CreateAttributeDialog } from "./CreateAttributeDialog";
 
-const typeIcons = {
-  text: Type,
+const typeIcons: Record<string, any> = {
+  text: FileText,
   number: Hash,
   date: Calendar,
   boolean: CheckSquare,
+  textarea: AlignLeft,
+  email: Mail,
+  phone: Phone,
+  url: LinkIcon,
+  file: Upload,
+  "Y/N": CheckSquare,
 };
 
 interface AttributesTableProps {

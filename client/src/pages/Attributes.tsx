@@ -43,14 +43,16 @@ export default function Attributes() {
     localStorage.setItem("attributes-view", newView);
   };
 
-  // Filter attributes based on search and type
-  const filteredAttributes = attributes.filter((attr) => {
-    const matchesSearch = 
-      attr.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      attr.type.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = typeFilter === "all" || attr.type === typeFilter;
-    return matchesSearch && matchesType;
-  });
+  // Filter attributes based on search and type, then sort alphabetically
+  const filteredAttributes = attributes
+    .filter((attr) => {
+      const matchesSearch = 
+        attr.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        attr.type.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesType = typeFilter === "all" || attr.type === typeFilter;
+      return matchesSearch && matchesType;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   // Transform attributes to include usageCount
   const attributesWithUsage = filteredAttributes.map((attr) => {
