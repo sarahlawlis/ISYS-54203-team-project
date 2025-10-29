@@ -43,16 +43,51 @@ const dataTypeToIcon: Record<string, string> = {
 interface CreateAttributeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  editAttributeId?: string;
 }
 
-export function CreateAttributeDialog({ open, onOpenChange }: CreateAttributeDialogProps) {
+export function CreateAttributeDialog({ open, onOpenChange, editAttributeId }: CreateAttributeDialogProps) {
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [type, setType] = useState("");
   const [description, setDescription] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
-  const handleCreate = async () => {
+  // Fetch attribute data when editing
+  const { data: editAttribute } = useQuery({
+    queryKey: ["/api/attributes", editAttributeId],
+    queryFn: async () => {
+      if (!editAttributeId) return null;
+      const response = await fetch(`/api/attributes/${editAttributeId}`);
+      if (!response.ok) throw new Error("Failed to fetch attribute");
+      return response.json();
+    },
+    enabled: !!editAttributeId && open,
+  });
+
+  // Populate form when editing
+  useState(() => {
+    if (editAttribute) {
+      setName(editAttribute.name || "");
+      setType(editAttribute.type || "");
+      setDescription(editAttribute.description || "");
+    } else if (!editAttributeId) {
+      setName("");
+      setType("");
+      setDescription("");
+    }
+  });
+
+  // Reset form when opening in create mode
+  useState(() => {
+    if (open && !editAttributeId) {
+      setName("");
+      setType("");
+      setDescription("");
+    }
+  });
+
+  const handleSave = async () => {
     if (!name.trim()) {
       toast({
         title: "Validation Error",
@@ -75,18 +110,28 @@ export function CreateAttributeDialog({ open, onOpenChange }: CreateAttributeDia
 
     try {
       const icon = dataTypeToIcon[type] || "FileText";
-      
-      await apiRequest("POST", "/api/attributes", {
+      const payload = {
         name: name.trim(),
         type,
         description: description.trim() || null,
         icon,
-      });
+      };
 
-      toast({
-        title: "Success",
-        description: "Attribute created successfully",
-      });
+      if (editAttributeId) {
+        // Update existing attribute
+        await apiRequest("PUT", `/api/attributes/${editAttributeId}`, payload);
+        toast({
+          title: "Success",
+          description: "Attribute updated successfully",
+        });
+      } else {
+        // Create new attribute
+        await apiRequest("POST", "/api/attributes", payload);
+        toast({
+          title: "Success",
+          description: "Attribute created successfully",
+        });
+      }
 
       // Reset form
       setName("");
@@ -99,7 +144,7 @@ export function CreateAttributeDialog({ open, onOpenChange }: CreateAttributeDia
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to create attribute",
+        description: editAttributeId ? "Failed to update attribute" : "Failed to create attribute",
         variant: "destructive",
       });
     } finally {
@@ -118,7 +163,9 @@ export function CreateAttributeDialog({ open, onOpenChange }: CreateAttributeDia
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]" data-testid="dialog-create-attribute">
         <DialogHeader>
-          <DialogTitle className="text-xl">Create Attribute</DialogTitle>
+          <DialogTitle className="text-xl">
+            {editAttributeId ? "Edit Attribute" : "Create Attribute"}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 pt-4">
@@ -179,11 +226,14 @@ export function CreateAttributeDialog({ open, onOpenChange }: CreateAttributeDia
             Cancel
           </Button>
           <Button
-            onClick={handleCreate}
+            onClick={handleSave}
             disabled={isCreating}
             data-testid="button-create-attribute"
           >
-            {isCreating ? "Creating..." : "Create Attribute"}
+            {isCreating 
+              ? (editAttributeId ? "Updating..." : "Creating...") 
+              : (editAttributeId ? "Update Attribute" : "Create Attribute")
+            }
           </Button>
         </div>
       </DialogContent>

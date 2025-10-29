@@ -14,11 +14,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get a single attribute by ID
+  app.get("/api/attributes/:id", async (req, res) => {
+    try {
+      const attribute = await storage.getAttributeById(req.params.id);
+      if (!attribute) {
+        return res.status(404).json({ error: "Attribute not found" });
+      }
+      res.json(attribute);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch attribute" });
+    }
+  });
+
   app.post("/api/attributes", async (req, res) => {
     try {
       const validatedData = insertAttributeSchema.parse(req.body);
       const attribute = await storage.createAttribute(validatedData);
       res.status(201).json(attribute);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid attribute data" });
+    }
+  });
+
+  // Update an attribute
+  app.put("/api/attributes/:id", async (req, res) => {
+    try {
+      const validatedData = insertAttributeSchema.parse(req.body);
+      const attribute = await storage.updateAttribute(req.params.id, validatedData);
+      if (!attribute) {
+        return res.status(404).json({ error: "Attribute not found" });
+      }
+      res.json(attribute);
     } catch (error) {
       res.status(400).json({ error: "Invalid attribute data" });
     }

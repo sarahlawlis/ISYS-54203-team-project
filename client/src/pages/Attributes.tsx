@@ -1,3 +1,4 @@
+
 import { AttributeCard } from "@/components/AttributeCard";
 import { AttributesTable } from "@/components/AttributesTable";
 import { ViewToggle, ViewMode } from "@/components/ViewToggle";
@@ -12,27 +13,20 @@ import {
 } from "@/components/ui/select";
 import { Plus, Search } from "lucide-react";
 import { useState, useEffect } from "react";
-
-//todo: remove mock functionality
-const mockAttributes = [
-  { id: "1", name: "customer_email", type: "text" as const, usageCount: 12 },
-  { id: "2", name: "project_budget", type: "number" as const, usageCount: 8 },
-  { id: "3", name: "deadline_date", type: "date" as const, usageCount: 15 },
-  { id: "4", name: "is_priority", type: "boolean" as const, usageCount: 20 },
-  { id: "5", name: "customer_name", type: "text" as const, usageCount: 18 },
-  { id: "6", name: "team_size", type: "number" as const, usageCount: 10 },
-  { id: "7", name: "start_date", type: "date" as const, usageCount: 14 },
-  { id: "8", name: "requires_approval", type: "boolean" as const, usageCount: 9 },
-  { id: "9", name: "department", type: "text" as const, usageCount: 16 },
-  { id: "10", name: "estimated_hours", type: "number" as const, usageCount: 11 },
-  { id: "11", name: "completion_date", type: "date" as const, usageCount: 13 },
-  { id: "12", name: "is_active", type: "boolean" as const, usageCount: 22 },
-];
+import { useQuery } from "@tanstack/react-query";
+import { CreateAttributeDialog } from "@/components/CreateAttributeDialog";
+import type { Attribute } from "@shared/schema";
 
 export default function Attributes() {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [view, setView] = useState<ViewMode>("cards");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+
+  // Fetch attributes from database
+  const { data: attributes = [] } = useQuery<Attribute[]>({
+    queryKey: ["/api/attributes"],
+  });
 
   useEffect(() => {
     const stored = localStorage.getItem("attributes-view") as ViewMode | null;
@@ -44,6 +38,23 @@ export default function Attributes() {
     localStorage.setItem("attributes-view", newView);
   };
 
+  // Filter attributes based on search and type
+  const filteredAttributes = attributes.filter((attr) => {
+    const matchesSearch = 
+      attr.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      attr.type.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = typeFilter === "all" || attr.type === typeFilter;
+    return matchesSearch && matchesType;
+  });
+
+  // Transform attributes to include usageCount (placeholder for now)
+  const attributesWithUsage = filteredAttributes.map((attr) => ({
+    id: attr.id,
+    name: attr.name,
+    type: attr.type as "text" | "number" | "date" | "boolean",
+    usageCount: 0, // TODO: Calculate actual usage count from forms
+  }));
+
   return (
     <div className="h-full overflow-auto">
       <div className="p-6 space-y-6">
@@ -54,7 +65,10 @@ export default function Attributes() {
               Reusable attributes for your forms and workflows
             </p>
           </div>
-          <Button data-testid="button-create-attribute">
+          <Button 
+            data-testid="button-create-attribute"
+            onClick={() => setIsCreateDialogOpen(true)}
+          >
             <Plus className="h-4 w-4 mr-2" />
             Create Attribute
           </Button>
@@ -81,6 +95,11 @@ export default function Attributes() {
               <SelectItem value="number">Number</SelectItem>
               <SelectItem value="date">Date</SelectItem>
               <SelectItem value="boolean">Boolean</SelectItem>
+              <SelectItem value="email">Email</SelectItem>
+              <SelectItem value="phone">Phone</SelectItem>
+              <SelectItem value="url">URL</SelectItem>
+              <SelectItem value="file">File</SelectItem>
+              <SelectItem value="Y/N">Y/N</SelectItem>
             </SelectContent>
           </Select>
           <ViewToggle view={view} onViewChange={handleViewChange} />
@@ -88,14 +107,19 @@ export default function Attributes() {
 
         {view === "cards" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {mockAttributes.map((attr) => (
+            {attributesWithUsage.map((attr) => (
               <AttributeCard key={attr.id} {...attr} />
             ))}
           </div>
         ) : (
-          <AttributesTable attributes={mockAttributes} />
+          <AttributesTable attributes={attributesWithUsage} />
         )}
       </div>
+
+      <CreateAttributeDialog 
+        open={isCreateDialogOpen} 
+        onOpenChange={setIsCreateDialogOpen} 
+      />
     </div>
   );
 }
