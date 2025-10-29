@@ -1,6 +1,7 @@
 
 import { db } from "./db";
 import { attributes } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 const builtInAttributes = [
   { name: "Customer Name", type: "text", icon: "FileText", description: null },
@@ -25,7 +26,7 @@ async function seedAttributes() {
   console.log("Seeding built-in attributes...");
   
   for (const attr of builtInAttributes) {
-    const existing = await db.select().from(attributes).where(attributes.name === attr.name);
+    const existing = await db.select().from(attributes).where(eq(attributes.name, attr.name));
     
     if (existing.length === 0) {
       await db.insert(attributes).values(attr);
