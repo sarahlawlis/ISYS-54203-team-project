@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
 import {
   FileText,
   Calendar,
@@ -66,26 +67,17 @@ export function CreateAttributeDialog({ open, onOpenChange, editAttributeId }: C
   });
 
   // Populate form when editing
-  useState(() => {
+  useEffect(() => {
     if (editAttribute) {
       setName(editAttribute.name || "");
       setType(editAttribute.type || "");
       setDescription(editAttribute.description || "");
-    } else if (!editAttributeId) {
+    } else if (!editAttributeId && open) {
       setName("");
       setType("");
       setDescription("");
     }
-  });
-
-  // Reset form when opening in create mode
-  useState(() => {
-    if (open && !editAttributeId) {
-      setName("");
-      setType("");
-      setDescription("");
-    }
-  });
+  }, [editAttribute, editAttributeId, open]);
 
   const handleSave = async () => {
     if (!name.trim()) {
