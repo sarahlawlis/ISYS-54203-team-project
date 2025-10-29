@@ -28,6 +28,11 @@ export default function Attributes() {
     queryKey: ["/api/attributes"],
   });
 
+  // Fetch forms to calculate usage count
+  const { data: forms = [] } = useQuery<any[]>({
+    queryKey: ["/api/forms"],
+  });
+
   useEffect(() => {
     const stored = localStorage.getItem("attributes-view") as ViewMode | null;
     if (stored) setView(stored);
@@ -47,13 +52,25 @@ export default function Attributes() {
     return matchesSearch && matchesType;
   });
 
-  // Transform attributes to include usageCount (placeholder for now)
-  const attributesWithUsage = filteredAttributes.map((attr) => ({
-    id: attr.id,
-    name: attr.name,
-    type: attr.type as "text" | "number" | "date" | "boolean",
-    usageCount: 0, // TODO: Calculate actual usage count from forms
-  }));
+  // Transform attributes to include usageCount
+  const attributesWithUsage = filteredAttributes.map((attr) => {
+    // Count how many forms use this attribute
+    const usageCount = forms.filter(form => {
+      try {
+        const formAttributes = JSON.parse(form.attributes || '[]');
+        return formAttributes.some((formAttr: any) => formAttr.id === attr.id);
+      } catch {
+        return false;
+      }
+    }).length;
+
+    return {
+      id: attr.id,
+      name: attr.name,
+      type: attr.type as "text" | "number" | "date" | "boolean",
+      usageCount,
+    };
+  });
 
   return (
     <div className="h-full overflow-auto">
