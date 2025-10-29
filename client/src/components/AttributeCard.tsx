@@ -16,7 +16,7 @@ export interface AttributeCardProps {
   name: string;
   type: "text" | "number" | "date" | "boolean";
   usageCount: number;
-  onEdit: (id: string) => void;
+  onEdit?: (id: string) => void;
 }
 
 const typeIcons = {
@@ -36,6 +36,14 @@ const typeColors = {
 export function AttributeCard({ id, name, type, usageCount, onEdit }: AttributeCardProps) {
   const Icon = typeIcons[type] || Type;
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  const handleEdit = () => {
+    if (onEdit) {
+      onEdit(id);
+    } else {
+      setIsEditDialogOpen(true);
+    }
+  };
 
   return (
     <>
@@ -65,7 +73,7 @@ export function AttributeCard({ id, name, type, usageCount, onEdit }: AttributeC
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem data-testid={`button-edit-attribute-${id}`} onClick={() => onEdit(id)}>
+              <DropdownMenuItem data-testid={`button-edit-attribute-${id}`} onClick={handleEdit}>
                 Edit
               </DropdownMenuItem>
               <DropdownMenuItem className="text-destructive" data-testid={`button-delete-attribute-${id}`}>
@@ -76,11 +84,13 @@ export function AttributeCard({ id, name, type, usageCount, onEdit }: AttributeC
         </div>
       </CardContent>
     </Card>
-    <CreateAttributeDialog
-        isOpen={isEditDialogOpen}
-        onClose={() => setIsEditDialogOpen(false)}
-        attributeId={id}
+    {!onEdit && (
+      <CreateAttributeDialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        editAttributeId={id}
       />
+    )}
     </>
   );
 }

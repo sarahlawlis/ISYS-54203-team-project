@@ -53,22 +53,6 @@ interface FormAttribute extends Attribute {
   visibility: 'Editable' | 'Required' | 'Read Only' | 'Hidden';
 }
 
-const builtInAttributes: Attribute[] = [
-  { id: "1", name: "Customer Name", type: "text", icon: FileText },
-  { id: "2", name: "Due Date", type: "date", icon: Calendar },
-  { id: "3", name: "Retailer", type: "text", icon: FileText },
-  { id: "4", name: "General Notes", type: "text", icon: AlignLeft },
-  { id: "5", name: "Structural Design Needed", type: "Y/N", icon: CheckSquare },
-  { id: "6", name: "Quotes", type: "file", icon: Upload },
-  { id: "7", name: "Purchase Orders", type: "file", icon: Upload },
-  { id: "8", name: "Structure Files", type: "file", icon: Upload },
-  { id: "n1", name: "Email", type: "email", icon: Mail },
-  { id: "n2", name: "Phone Number", type: "phone", icon: Phone },
-  { id: "n3", name: "Number", type: "number", icon: Hash },
-  { id: "n4", name: "URL", type: "url", icon: LinkIcon },
-  { id: "n5", name: "Long Text", type: "textarea", icon: AlignLeft },
-];
-
 // Helper function to convert icon string to actual icon component
 const getIconComponent = (iconName: string) => {
   const iconMap: Record<string, any> = {
@@ -101,15 +85,15 @@ export default function FormCreation() {
     queryKey: ["/api/attributes"],
   });
 
-  // Merge built-in and custom attributes
+  // Convert database attributes to component format
   const allAttributes = useMemo(() => {
-    const customAttrs: Attribute[] = customAttributes.map(attr => ({
+    return customAttributes.map(attr => ({
       id: attr.id,
       name: attr.name,
       type: attr.type,
       icon: getIconComponent(attr.icon),
+      description: attr.description,
     }));
-    return [...builtInAttributes, ...customAttrs];
   }, [customAttributes]);
 
   // Load form data when editing existing form
