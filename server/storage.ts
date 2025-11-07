@@ -1,9 +1,9 @@
-import { type User, type InsertUser, type Attribute, type InsertAttribute, type Workflow, type InsertWorkflow, type Project, type InsertProject, type ProjectForm, type InsertProjectForm, type ProjectWorkflow, type InsertProjectWorkflow, type FormSubmission, type InsertFormSubmission } from "@shared/schema";
+import { type User, type InsertUser, type Attribute, type InsertAttribute, type Workflow, type InsertWorkflow, type Project, type InsertProject, type ProjectForm, type InsertProjectForm, type ProjectWorkflow, type InsertProjectWorkflow, type FormSubmission, type InsertFormSubmission, type AuditLog, type InsertAuditLog } from "@shared/schema";
 import * as schema from "@shared/schema";
 import { eq, sql as drizzleSql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { attributes, workflows, projects, projectForms, projectWorkflows, formSubmissions } from "@shared/schema";
+import { attributes, workflows, projects, projectForms, projectWorkflows, formSubmissions, auditLogs } from "@shared/schema";
 
 // modify the interface with any CRUD methods
 // you might need
@@ -52,6 +52,10 @@ export interface IStorage {
 
   getFormSubmissions(projectId?: string): Promise<FormSubmission[]>;
   createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission>;
+
+  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+  getAuditLogs(limit?: number): Promise<AuditLog[]>;
+  countAdmins(): Promise<number>;
 }
 
 export class MemStorage implements IStorage {
@@ -258,6 +262,22 @@ export class MemStorage implements IStorage {
   async createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission> {
     const [newSubmission] = await db.insert(formSubmissions).values(submission).returning();
     return newSubmission;
+  }
+
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    const [auditLog] = await db.insert(auditLogs).values(log).returning();
+    return auditLog;
+  }
+
+  async getAuditLogs(limit: number = 100): Promise<AuditLog[]> {
+    return await db.select().from(auditLogs).orderBy(drizzleSql`${auditLogs.timestamp} DESC`).limit(limit);
+  }
+
+  async countAdmins(): Promise<number> {
+    const result = await db.select({ count: drizzleSql<number>`count(*)` })
+      .from(schema.users)
+      .where(drizzleSql`${schema.users.role} = 'admin' AND ${schema.users.isActive} = 'true'`);
+    return Number(result[0]?.count || 0);
   }
 }
 

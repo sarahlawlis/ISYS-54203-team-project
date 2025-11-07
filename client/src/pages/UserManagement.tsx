@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, UserPlus, Shield, User as UserIcon, Search, AlertTriangle, CheckCircle2, XCircle, UserX, UserCheck } from "lucide-react";
+import { Loader2, UserPlus, Shield, User as UserIcon, Search, AlertTriangle, CheckCircle2, XCircle, UserX, UserCheck, KeyRound, History, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { User } from "@shared/schema";
@@ -73,10 +73,14 @@ export default function UserManagement() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [roleChangeDialog, setRoleChangeDialog] = useState<{ open: boolean; userId: string; newRole: string } | null>(null);
   const [statusChangeDialog, setStatusChangeDialog] = useState<{ open: boolean; userId: string; newStatus: boolean } | null>(null);
+  const [passwordResetDialog, setPasswordResetDialog] = useState<{ open: boolean; userId: string; username: string } | null>(null);
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState<"admin" | "user">("user");
   const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [resetPassword, setResetPassword] = useState("");
 
   const { data: currentUser } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -104,12 +108,17 @@ export default function UserManagement() {
 
   const filteredUsers = useMemo(() => {
     if (!users) return [];
-    if (!searchQuery) return users;
     
-    return users.filter(user =>
-      user.username.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [users, searchQuery]);
+    return users.filter(user => {
+      const matchesSearch = user.username.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesRole = roleFilter === "all" || user.role === roleFilter;
+      const matchesStatus = statusFilter === "all" || 
+        (statusFilter === "active" && user.isActive === "true") ||
+        (statusFilter === "inactive" && user.isActive === "false");
+      
+      return matchesSearch && matchesRole && matchesStatus;
+    });
+  }, [users, searchQuery, roleFilter, statusFilter]);
 
   const createUserMutation = useMutation({
     mutationFn: async (userData: { username: string; password: string; role: string }) => {
@@ -185,6 +194,32 @@ export default function UserManagement() {
       toast({
         title: "Error",
         description: error.message || "Failed to update user status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ userId, newPassword }: { userId: string; newPassword: string }) => {
+      const response = await apiRequest("POST", `/api/users/${userId}/reset-password`, { newPassword });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to reset password");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Password reset successfully",
+      });
+      setPasswordResetDialog(null);
+      setResetPassword("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to reset password",
         variant: "destructive",
       });
     },
@@ -272,7 +307,28 @@ export default function UserManagement() {
     }
   };
 
+  const handleResetPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (resetPassword.length < 8) {
+      toast({
+        title: "Weak Password",
+        description: "Password must be at least 8 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (passwordResetDialog) {
+      resetPasswordMutation.mutate({
+        userId: passwordResetDialog.userId,
+        newPassword: resetPassword,
+      });
+    }
+  };
+
   const passwordStrength = useMemo(() => calculatePasswordStrength(newPassword), [newPassword]);
+  const resetPasswordStrength = useMemo(() => calculatePasswordStrength(resetPassword), [resetPassword]);
 
   if (isLoading) {
     return (
@@ -300,23 +356,48 @@ export default function UserManagement() {
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div>
-                <CardTitle>Users</CardTitle>
-                <CardDescription>
-                  {filteredUsers.length} {filteredUsers.length === 1 ? 'user' : 'users'} 
-                  {searchQuery && ` matching "${searchQuery}"`}
-                </CardDescription>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <CardTitle>Users</CardTitle>
+                  <CardDescription>
+                    {filteredUsers.length} {filteredUsers.length === 1 ? 'user' : 'users'} 
+                    {(searchQuery || roleFilter !== "all" || statusFilter !== "all") && " with filters applied"}
+                  </CardDescription>
+                </div>
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search users..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                    data-testid="input-search-users"
+                  />
+                </div>
               </div>
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search users..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                  data-testid="input-search-users"
-                />
+              <div className="flex items-center gap-2 flex-wrap">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <SelectTrigger className="w-32" data-testid="select-role-filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Roles</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="user">User</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-32" data-testid="select-status-filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardHeader>
@@ -378,7 +459,7 @@ export default function UserManagement() {
                       {new Date(user.createdAt).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
+                      <div className="flex justify-end gap-2 flex-wrap">
                         <Select
                           value={user.role}
                           onValueChange={(value) => handleRoleChange(user.id, value)}
@@ -392,6 +473,15 @@ export default function UserManagement() {
                             <SelectItem value="admin">Admin</SelectItem>
                           </SelectContent>
                         </Select>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPasswordResetDialog({ open: true, userId: user.id, username: user.username })}
+                          data-testid={`button-reset-password-${user.id}`}
+                        >
+                          <KeyRound className="mr-1 h-3 w-3" />
+                          Reset
+                        </Button>
                         <Button
                           variant={user.isActive === 'true' ? "outline" : "default"}
                           size="sm"
@@ -569,6 +659,79 @@ export default function UserManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={passwordResetDialog?.open || false} onOpenChange={(open) => !open && setPasswordResetDialog(null)}>
+        <DialogContent data-testid="dialog-reset-password">
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>
+              Set a new password for <strong>{passwordResetDialog?.username}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleResetPassword}>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="reset-password">New Password</Label>
+                <Input
+                  id="reset-password"
+                  type="password"
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  data-testid="input-reset-password"
+                  placeholder="Enter new password"
+                />
+                {resetPassword && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Password strength:</span>
+                      <span className={`font-medium ${
+                        resetPasswordStrength.strength >= 75 ? 'text-green-600 dark:text-green-400' :
+                        resetPasswordStrength.strength >= 50 ? 'text-yellow-600 dark:text-yellow-400' :
+                        'text-red-600 dark:text-red-400'
+                      }`}>
+                        {resetPasswordStrength.label}
+                      </span>
+                    </div>
+                    <Progress value={resetPasswordStrength.strength} className="h-2" />
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Minimum 8 characters. Include uppercase, lowercase, numbers, and symbols for best security.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setPasswordResetDialog(null);
+                  setResetPassword("");
+                }}
+                data-testid="button-cancel-reset"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={resetPasswordMutation.isPending}
+                data-testid="button-confirm-reset"
+              >
+                {resetPasswordMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Resetting...
+                  </>
+                ) : (
+                  "Reset Password"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

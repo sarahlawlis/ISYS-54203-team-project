@@ -155,10 +155,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid role" });
       }
 
+      const targetUser = await storage.getUser(req.params.id);
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (targetUser.role === 'admin' && role === 'user') {
+        const adminCount = await storage.countAdmins();
+        if (adminCount <= 1) {
+          return res.status(403).json({ error: "Cannot demote the last active admin" });
+        }
+      }
+
       const user = await storage.updateUserRole(req.params.id, role);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
+
+      const performedBy = await storage.getUser(req.session.userId!);
+      await storage.createAuditLog({
+        action: 'ROLE_CHANGE',
+        targetUserId: user.id,
+        targetUsername: user.username,
+        performedBy: req.session.userId!,
+        performedByUsername: performedBy!.username,
+        details: `Role changed from ${targetUser.role} to ${role}`,
+      });
 
       res.json(sanitizeUser(user));
     } catch (error) {
@@ -182,6 +204,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdBy: req.session.userId,
       });
 
+      const performedBy = await storage.getUser(req.session.userId!);
+      await storage.createAuditLog({
+        action: 'USER_CREATED',
+        targetUserId: user.id,
+        targetUsername: user.username,
+        performedBy: req.session.userId!,
+        performedByUsername: performedBy!.username,
+        details: `Created user with role: ${user.role}`,
+      });
+
       res.status(201).json(sanitizeUser(user));
     } catch (error: any) {
       if (error.errors) {
@@ -203,14 +235,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "isActive must be a boolean" });
       }
 
+      const targetUser = await storage.getUser(req.params.id);
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (targetUser.role === 'admin' && targetUser.isActive === 'true' && !isActive) {
+        const adminCount = await storage.countAdmins();
+        if (adminCount <= 1) {
+          return res.status(403).json({ error: "Cannot deactivate the last active admin" });
+        }
+      }
+
       const user = await storage.updateUserActiveStatus(req.params.id, isActive);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
 
+      const performedBy = await storage.getUser(req.session.userId!);
+      await storage.createAuditLog({
+        action: isActive ? 'USER_ACTIVATED' : 'USER_DEACTIVATED',
+        targetUserId: user.id,
+        targetUsername: user.username,
+        performedBy: req.session.userId!,
+        performedByUsername: performedBy!.username,
+        details: `Account ${isActive ? 'activated' : 'deactivated'}`,
+      });
+
       res.json(sanitizeUser(user));
     } catch (error) {
       res.status(500).json({ error: "Failed to update user status" });
+    }
+  });
+
+  app.post("/api/users/:id/reset-password", requireAdmin, async (req, res) => {
+    try {
+      const { newPassword } = req.body;
+
+      if (!newPassword || newPassword.length < 8) {
+        return res.status(400).json({ error: "Password must be at least 8 characters" });
+      }
+
+      const targetUser = await storage.getUser(req.params.id);
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const hashedPassword = await hashPassword(newPassword);
+      await storage.updateUserPassword(req.params.id, hashedPassword);
+
+      const performedBy = await storage.getUser(req.session.userId!);
+      await storage.createAuditLog({
+        action: 'PASSWORD_RESET',
+        targetUserId: targetUser.id,
+        targetUsername: targetUser.username,
+        performedBy: req.session.userId!,
+        performedByUsername: performedBy!.username,
+        details: 'Password reset by administrator',
+      });
+
+      res.json({ message: "Password reset successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to reset password" });
+    }
+  });
+
+  app.get("/api/audit-logs", requireAdmin, async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
+      const logs = await storage.getAuditLogs(limit);
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch audit logs" });
     }
   });
 
