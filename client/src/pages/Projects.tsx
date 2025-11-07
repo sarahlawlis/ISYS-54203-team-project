@@ -28,26 +28,30 @@ export default function Projects() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const { toast } = useToast();
 
-  const { data: projects = [], isLoading } = useQuery<Project[]>({
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
   });
 
+  const { data: allWorkflows = [], isLoading: workflowsLoading } = useQuery<ProjectWorkflow[]>({
+    queryKey: ["/api/project-workflows/all"],
+  });
+
+  const { data: allMembers = [], isLoading: membersLoading } = useQuery<ProjectMember[]>({
+    queryKey: ["/api/project-members/all"],
+  });
+
+  const isLoading = projectsLoading || workflowsLoading || membersLoading;
+
   const projectsWithCounts = projects.map((project) => {
-    const { data: workflows = [] } = useQuery<ProjectWorkflow[]>({
-      queryKey: ["/api/projects", project.id, "workflows"],
-      enabled: !!project.id,
-    });
-
-    const { data: members = [] } = useQuery<ProjectMember[]>({
-      queryKey: ["/api/projects", project.id, "members"],
-      enabled: !!project.id,
-    });
-
+    const workflows = allWorkflows.filter(w => w.projectId === project.id);
+    const members = allMembers.filter(m => m.projectId === project.id);
+    const totalWorkflows = workflows.length;
     const activeWorkflows = workflows.filter(w => w.status === "running").length;
 
     return {
       ...project,
       activeWorkflows,
+      totalWorkflows,
       teamSize: members.length,
     };
   });

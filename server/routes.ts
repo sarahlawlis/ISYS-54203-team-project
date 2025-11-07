@@ -253,7 +253,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Project Workflows routes
-  app.get("/api/projects/:id/workflows", async (req, res) => {
+  app.get("/api/project-workflows/all", isAuthenticated, async (req, res) => {
+    try {
+      const allWorkflows = await storage.getAllProjectWorkflows();
+      res.json(allWorkflows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch all project workflows" });
+    }
+  });
+
+  app.get("/api/projects/:id/workflows", isAuthenticated, async (req, res) => {
     try {
       const projectWorkflows = await storage.getProjectWorkflows(req.params.id);
       res.json(projectWorkflows);
@@ -364,6 +373,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Project Members routes (protected)
+  app.get("/api/project-members/all", isAuthenticated, async (req, res) => {
+    try {
+      const allMembers = await storage.getAllProjectMembers();
+      res.json(allMembers);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch all project members" });
+    }
+  });
+
   app.get("/api/projects/:id/members", isAuthenticated, async (req, res) => {
     try {
       const members = await storage.getProjectMembers(req.params.id);
