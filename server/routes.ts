@@ -3,12 +3,25 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertAttributeSchema, insertFormSchema, insertWorkflowSchema, insertProjectSchema, insertProjectFormSchema, insertProjectWorkflowSchema, insertFormSubmissionSchema, insertUserSchema, loginUserSchema } from "@shared/schema";
 import { hashPassword, verifyPassword, sanitizeUser, isAdmin } from "./auth";
+import { requirePermission, requireRole, canModifyProject } from "./permissions";
+import "./types";
 
-// Middleware to check if user is authenticated
-function requireAuth(req: Request, res: Response, next: NextFunction) {
+// Middleware to check if user is authenticated and attach user to request
+async function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session.userId) {
     return res.status(401).json({ error: "Unauthorized" });
   }
+  
+  const user = await storage.getUser(req.session.userId);
+  if (!user) {
+    return res.status(401).json({ error: "User not found" });
+  }
+  
+  if (user.isActive === 'false') {
+    return res.status(403).json({ error: "Account is deactivated" });
+  }
+  
+  req.user = user;
   next();
 }
 
@@ -21,6 +34,7 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (!isAdmin(user)) {
     return res.status(403).json({ error: "Forbidden - Admin access required" });
   }
+  req.user = user;
   next();
 }
 
@@ -151,7 +165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { role } = req.body;
-      if (role !== 'admin' && role !== 'user') {
+      if (role !== 'admin' && role !== 'user' && role !== 'viewer') {
         return res.status(400).json({ error: "Invalid role" });
       }
 
@@ -498,21 +512,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/projects", requireAdmin, async (req, res) => {
+  app.post("/api/projects", requireAuth, async (req, res) => {
     try {
+      const user = req.user!;
+      
+      if (user.role === 'viewer') {
+        return res.status(403).json({ 
+          error: "Insufficient permissions",
+          message: "Viewers cannot create projects",
+        });
+      }
+
       const validatedData = insertProjectSchema.parse(req.body);
-      const project = await storage.createProject(validatedData);
+      const project = await storage.createProject({
+        ...validatedData,
+        ownerId: user.id,
+      });
       res.status(201).json(project);
     } catch (error) {
       res.status(400).json({ error: "Invalid project data" });
     }
   });
 
-  app.put("/api/projects/:id", requireAdmin, async (req, res) => {
+  app.put("/api/projects/:id", requireAuth, async (req, res) => {
     try {
+      const user = req.user!;
+      const project = await storage.getProjectById(req.params.id);
+      
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      if (!canModifyProject(user, project.ownerId)) {
+        return res.status(403).json({ 
+          error: "Insufficient permissions",
+          message: "You can only edit your own projects",
+        });
+      }
+
       const { formIds, workflowIds, ...projectData } = req.body;
       const validatedData = insertProjectSchema.partial().parse(projectData);
-      const project = await storage.updateProject(req.params.id, validatedData);
+      const updatedProject = await storage.updateProject(req.params.id, validatedData);
 
       if (formIds !== undefined) {
         const existingForms = await storage.getProjectForms(req.params.id);
@@ -542,14 +582,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ]);
       }
 
-      res.json(project);
+      res.json(updatedProject);
     } catch (error) {
       res.status(400).json({ error: "Invalid project data" });
     }
   });
 
-  app.delete("/api/projects/:id", requireAdmin, async (req, res) => {
+  app.delete("/api/projects/:id", requireAuth, async (req, res) => {
     try {
+      const user = req.user!;
+      const project = await storage.getProjectById(req.params.id);
+      
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      if (!canModifyProject(user, project.ownerId)) {
+        return res.status(403).json({ 
+          error: "Insufficient permissions",
+          message: "You can only delete your own projects",
+        });
+      }
+
       await storage.deleteProject(req.params.id);
       res.status(204).send();
     } catch (error) {
