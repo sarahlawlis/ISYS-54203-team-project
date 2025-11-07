@@ -53,12 +53,9 @@ export default function Account() {
     setIsChangingPassword(true);
 
     try {
-      await apiRequest("/api/auth/password", {
-        method: "PUT",
-        body: JSON.stringify({
-          currentPassword,
-          newPassword,
-        }),
+      await apiRequest("PUT", "/api/auth/password", {
+        currentPassword,
+        newPassword,
       });
 
       toast({
