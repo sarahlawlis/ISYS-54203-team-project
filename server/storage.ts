@@ -40,6 +40,7 @@ export interface IStorage {
   removeProjectForm(projectId: string, formId: string): Promise<void>;
 
   getProjectWorkflows(projectId: string): Promise<ProjectWorkflow[]>;
+  getAllProjectWorkflows(): Promise<ProjectWorkflow[]>;
   addProjectWorkflow(projectWorkflow: InsertProjectWorkflow): Promise<ProjectWorkflow>;
   updateProjectWorkflow(id: string, projectWorkflow: Partial<InsertProjectWorkflow>): Promise<ProjectWorkflow>;
   removeProjectWorkflow(id: string): Promise<void>;
@@ -58,6 +59,7 @@ export interface IStorage {
 
   // Project member operations
   getProjectMembers(projectId: string): Promise<ProjectMember[]>;
+  getAllProjectMembers(): Promise<ProjectMember[]>;
   getUserProjects(userId: string): Promise<Project[]>;
   addProjectMember(member: InsertProjectMember): Promise<ProjectMember>;
   removeProjectMember(projectId: string, userId: string): Promise<void>;
@@ -222,6 +224,10 @@ export class MemStorage implements IStorage {
     return await db.select().from(projectWorkflows).where(eq(projectWorkflows.projectId, projectId));
   }
 
+  async getAllProjectWorkflows(): Promise<ProjectWorkflow[]> {
+    return await db.select().from(projectWorkflows);
+  }
+
   async addProjectWorkflow(projectWorkflow: InsertProjectWorkflow): Promise<ProjectWorkflow> {
     const [newProjectWorkflow] = await db.insert(projectWorkflows).values(projectWorkflow).returning();
     return newProjectWorkflow;
@@ -281,6 +287,10 @@ export class MemStorage implements IStorage {
   // Project member operations
   async getProjectMembers(projectId: string): Promise<ProjectMember[]> {
     return await db.select().from(projectMembers).where(eq(projectMembers.projectId, projectId));
+  }
+
+  async getAllProjectMembers(): Promise<ProjectMember[]> {
+    return await db.select().from(projectMembers);
   }
 
   async getUserProjects(userId: string): Promise<Project[]> {
