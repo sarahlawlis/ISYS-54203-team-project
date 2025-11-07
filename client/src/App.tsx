@@ -1,71 +1,92 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import Dashboard from "@/pages/Dashboard";
-import Projects from "@/pages/Projects";
-import ProjectDetail from "@/pages/ProjectDetail";
-import Workflows from "@/pages/Workflows";
-import WorkflowDesigner from "@/pages/WorkflowDesigner";
-import Forms from "@/pages/Forms";
-import FormCreation from "@/pages/FormCreation";
-import Attributes from "@/pages/Attributes";
-import SearchPage from "@/pages/SearchPage";
-import SearchCreation from "@/pages/SearchCreation";
-import NotFound from "@/pages/not-found";
-import { auth } from "./lib/auth";
-import { useLocation } from "wouter";
-import { useEffect } from "react";
+import NotFound from "./pages/not-found";
+import Dashboard from "./pages/Dashboard";
+import Attributes from "./pages/Attributes";
+import Forms from "./pages/Forms";
+import FormCreation from "./pages/FormCreation";
+import Workflows from "./pages/Workflows";
+import WorkflowDesigner from "./pages/WorkflowDesigner";
+import Projects from "./pages/Projects";
+import ProjectDetail from "./pages/ProjectDetail";
+import SearchPage from "./pages/SearchPage";
+import SearchCreation from "./pages/SearchCreation";
 import Login from "./pages/Login";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
+import { useEffect } from "react";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { ThemeToggle } from "@/components/ThemeToggle";
+
+function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+  const [, setLocation] = useLocation();
+
+  const { data: user, isLoading } = useQuery({
+    queryKey: ['auth'],
+    queryFn: async () => {
+      const response = await fetch('/api/auth/me');
+      if (!response.ok) throw new Error('Not authenticated');
+      return response.json();
+    },
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      setLocation('/login');
+    }
+  }, [user, isLoading, setLocation]);
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  return <Component />;
+}
 
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/projects/:id" component={ProjectDetail} />
-      <Route path="/projects" component={Projects} />
-      <Route path="/workflows/:id" component={WorkflowDesigner} />
-      <Route path="/workflows" component={Workflows} />
-      <Route path="/forms/new" component={FormCreation} />
-      <Route path="/forms" component={Forms} />
-      <Route path="/attributes" component={Attributes} />
-      <Route path="/search/new" component={SearchCreation} />
-      <Route path="/search" component={SearchPage} />
-      <Route component={NotFound} />
+      <Route path="/login" component={Login} />
+      <Route>
+        <SidebarProvider>
+          <div className="flex min-h-screen w-full">
+            <AppSidebar />
+            <main className="flex-1 overflow-auto">
+              <Switch>
+                <Route path="/" component={() => <ProtectedRoute component={Dashboard} />} />
+                <Route path="/attributes" component={() => <ProtectedRoute component={Attributes} />} />
+                <Route path="/forms" component={() => <ProtectedRoute component={Forms} />} />
+                <Route path="/forms/create" component={() => <ProtectedRoute component={FormCreation} />} />
+                <Route path="/workflows" component={() => <ProtectedRoute component={Workflows} />} />
+                <Route path="/workflows/create" component={() => <ProtectedRoute component={WorkflowDesigner} />} />
+                <Route path="/workflows/:id" component={() => <ProtectedRoute component={WorkflowDesigner} />} />
+                <Route path="/projects" component={() => <ProtectedRoute component={Projects} />} />
+                <Route path="/projects/:id" component={() => <ProtectedRoute component={ProjectDetail} />} />
+                <Route path="/search" component={() => <ProtectedRoute component={SearchPage} />} />
+                <Route path="/search/create" component={() => <ProtectedRoute component={SearchCreation} />} />
+                <Route component={NotFound} />
+              </Switch>
+            </main>
+          </div>
+        </SidebarProvider>
+      </Route>
     </Switch>
   );
 }
 
 export default function App() {
-  const [location, setLocation] = useLocation();
-  const isAuthenticated = auth.isAuthenticated();
-
-  useEffect(() => {
-    // Redirect to login if not authenticated and not already on login page
-    if (!isAuthenticated && location !== "/login") {
-      setLocation("/login");
-    }
-  }, [isAuthenticated, location, setLocation]);
-
   const style = {
-    "--sidebar-width": "280px",
+    "--sidebar-width": "16rem",
+    "--sidebar-width-icon": "3rem",
   };
-
-  // Show login page if not authenticated
-  if (!isAuthenticated) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Login />
-          <Toaster />
-        </TooltipProvider>
-      </QueryClientProvider>
-    );
-  }
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -1,25 +1,20 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
-  email: text("email").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").notNull().default('user'), // 'admin', 'user', 'viewer'
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  role: text("role").notNull().default('user'), // 'admin' or 'user'
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-}).extend({
-  role: z.enum(['admin', 'user', 'viewer']).default('user'),
+export const insertUserSchema = createInsertSchema(users).pick({
+  username: true,
+  password: true,
+  role: true,
 });
 
 export const loginUserSchema = z.object({
@@ -28,8 +23,8 @@ export const loginUserSchema = z.object({
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
 export type LoginUser = z.infer<typeof loginUserSchema>;
+export type User = typeof users.$inferSelect;
 
 export const attributes = pgTable("attributes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -124,7 +119,6 @@ export const projectWorkflows = pgTable("project_workflows", {
   projectId: varchar("project_id").notNull(),
   workflowId: varchar("workflow_id").notNull(),
   status: text("status").notNull().default('pending'),
-  assignedTo: varchar("assigned_to"),
   startedAt: text("started_at"),
   completedAt: text("completed_at"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -139,42 +133,6 @@ export const insertProjectWorkflowSchema = createInsertSchema(projectWorkflows).
 
 export type InsertProjectWorkflow = z.infer<typeof insertProjectWorkflowSchema>;
 export type ProjectWorkflow = typeof projectWorkflows.$inferSelect;
-
-// User-Project assignments (who can access/manage which projects)
-export const userProjects = pgTable("user_projects", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull(),
-  projectId: varchar("project_id").notNull(),
-  role: text("role").notNull().default('viewer'), // 'owner', 'editor', 'viewer'
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-export const insertUserProjectSchema = createInsertSchema(userProjects).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  role: z.enum(['owner', 'editor', 'viewer']).default('viewer'),
-});
-
-export type InsertUserProject = z.infer<typeof insertUserProjectSchema>;
-export type UserProject = typeof userProjects.$inferSelect;
-
-// Sessions for authentication
-export const sessions = pgTable("sessions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull(),
-  token: text("token").notNull().unique(),
-  expiresAt: timestamp("expires_at").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-export const insertSessionSchema = createInsertSchema(sessions).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertSession = z.infer<typeof insertSessionSchema>;
-export type Session = typeof sessions.$inferSelect;
 
 export const formSubmissions = pgTable("form_submissions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
