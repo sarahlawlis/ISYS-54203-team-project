@@ -32,6 +32,26 @@ export default function Projects() {
     queryKey: ["/api/projects"],
   });
 
+  const projectsWithCounts = projects.map((project) => {
+    const { data: workflows = [] } = useQuery<ProjectWorkflow[]>({
+      queryKey: ["/api/projects", project.id, "workflows"],
+      enabled: !!project.id,
+    });
+
+    const { data: members = [] } = useQuery<ProjectMember[]>({
+      queryKey: ["/api/projects", project.id, "members"],
+      enabled: !!project.id,
+    });
+
+    const activeWorkflows = workflows.filter(w => w.status === "running").length;
+
+    return {
+      ...project,
+      activeWorkflows,
+      teamSize: members.length,
+    };
+  });
+
   useEffect(() => {
     const stored = localStorage.getItem("projects-view") as ViewMode | null;
     if (stored) setView(stored);
@@ -42,7 +62,7 @@ export default function Projects() {
     localStorage.setItem("projects-view", newView);
   };
 
-  const filteredProjects = projects.filter((project) => {
+  const filteredProjects = projectsWithCounts.filter((project) => {
     const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || project.status === statusFilter;
@@ -140,7 +160,7 @@ export default function Projects() {
           ) : filteredProjects.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-muted-foreground">
-                {projects.length === 0
+                {projectsWithCounts.length === 0
                   ? "No projects yet. Create your first project to get started."
                   : "No projects match your search criteria."}
               </p>
@@ -155,8 +175,8 @@ export default function Projects() {
                   description={project.description || ""}
                   status={project.status as "active" | "planning" | "on-hold" | "completed"}
                   dueDate={project.dueDate || ""}
-                  teamSize={parseInt(project.teamSize) || 0}
-                  activeWorkflows={0}
+                  teamSize={project.teamSize}
+                  activeWorkflows={project.activeWorkflows}
                   onEdit={() => handleEditProject(project)}
                   onDelete={() => handleDeleteProject(project.id)}
                 />
@@ -170,8 +190,8 @@ export default function Projects() {
                 description: project.description || "",
                 status: project.status as "active" | "planning" | "on-hold" | "completed",
                 dueDate: project.dueDate || "",
-                teamSize: parseInt(project.teamSize) || 0,
-                activeWorkflows: 0,
+                teamSize: project.teamSize,
+                activeWorkflows: project.activeWorkflows,
                 onEdit: () => handleEditProject(project),
                 onDelete: () => handleDeleteProject(project.id),
               }))}
