@@ -135,6 +135,15 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
   });
 
   const handleSubmit = (data: CreateProjectFormData) => {
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "User not authenticated. Please refresh the page.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     createProjectMutation.mutate({
       ...data,
       formIds: selectedForms,
@@ -372,7 +381,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
               </Button>
               <Button
                 type="submit"
-                disabled={createProjectMutation.isPending}
+                disabled={createProjectMutation.isPending || !user?.id}
                 data-testid="button-submit-project"
               >
                 {createProjectMutation.isPending && (
