@@ -156,6 +156,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/users", requireAdmin, async (req, res) => {
+    try {
+      const validatedData = insertUserSchema.parse(req.body);
+
+      const existingUser = await storage.getUserByUsername(validatedData.username);
+      if (existingUser) {
+        return res.status(400).json({ error: "Username already exists" });
+      }
+
+      const hashedPassword = await hashPassword(validatedData.password);
+      const user = await storage.createUser({
+        ...validatedData,
+        password: hashedPassword,
+      });
+
+      res.status(201).json(sanitizeUser(user));
+    } catch (error) {
+      res.status(400).json({ error: "Invalid user data" });
+    }
+  });
+
   // Attributes routes
   app.get("/api/attributes", requireAuth, async (_req, res) => {
     try {
