@@ -54,6 +54,10 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
   const [selectedForms, setSelectedForms] = useState<string[]>([]);
   const [selectedWorkflows, setSelectedWorkflows] = useState<string[]>([]);
 
+  const { data: user } = useQuery({
+    queryKey: ["/api/auth/user"],
+  });
+
   const { data: forms = [] } = useQuery<FormType[]>({
     queryKey: ["/api/forms"],
     enabled: open,
@@ -82,7 +86,10 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
     mutationFn: async (data: CreateProjectFormData) => {
       const { formIds, workflowIds, startWorkflows, ...projectData } = data;
       
-      const projectRes = await apiRequest("POST", "/api/projects", projectData);
+      const projectRes = await apiRequest("POST", "/api/projects", {
+        ...projectData,
+        ownerId: user?.id,
+      });
       const project = await projectRes.json();
 
       if (formIds && formIds.length > 0) {
