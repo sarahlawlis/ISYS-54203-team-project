@@ -1,11 +1,249 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertAttributeSchema, insertFormSchema, insertWorkflowSchema, insertProjectSchema, insertProjectFormSchema, insertProjectWorkflowSchema, insertFormSubmissionSchema } from "@shared/schema";
+import { 
+  insertAttributeSchema, insertFormSchema, insertWorkflowSchema, insertProjectSchema, 
+  insertProjectFormSchema, insertProjectWorkflowSchema, insertFormSubmissionSchema,
+  insertUserSchema, loginUserSchema, insertUserProjectSchema
+} from "@shared/schema";
+
+// Middleware to check authentication
+async function authenticateRequest(req: Request, res: Response, next: NextFunction) {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  
+  if (!token) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const session = await storage.getSessionByToken(token);
+  if (!session) {
+    return res.status(401).json({ error: "Invalid or expired session" });
+  }
+
+  const user = await storage.getUserById(session.userId);
+  if (!user) {
+    return res.status(401).json({ error: "User not found" });
+  }
+
+  (req as any).user = user;
+  next();
+}
+
+// Middleware to check if user is admin
+function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  const user = (req as any).user;
+  if (user.role !== 'admin') {
+    return res.status(403).json({ error: "Admin access required" });
+  }
+  next();
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Attributes routes
-  app.get("/api/attributes", async (_req, res) => {
+  // Authentication routes
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const validatedData = insertUserSchema.parse(req.body);
+      
+      // Check if username or email already exists
+      const existingUser = await storage.getUserByUsername(validatedData.username);
+      if (existingUser) {
+        return res.status(400).json({ error: "Username already exists" });
+      }
+
+      const user = await storage.createUser(validatedData);
+      const session = await storage.createSession(user.id);
+      
+      res.status(201).json({ 
+        user: { ...user, password: undefined },
+        token: session.token
+      });
+    } catch (error) {
+      res.status(400).json({ error: "Invalid user data" });
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const validatedData = loginUserSchema.parse(req.body);
+      const user = await storage.authenticateUser(validatedData);
+      
+      if (!user) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      const session = await storage.createSession(user.id);
+      
+      res.json({ 
+        user: { ...user, password: undefined },
+        token: session.token
+      });
+    } catch (error) {
+      res.status(400).json({ error: "Invalid login data" });
+    }
+  });
+
+  app.post("/api/auth/logout", authenticateRequest, async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace('Bearer ', '');
+      if (token) {
+        await storage.deleteSession(token);
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to logout" });
+    }
+  });
+
+  app.get("/api/auth/me", authenticateRequest, async (req, res) => {
+    const user = (req as any).user;
+    res.json({ ...user, password: undefined });
+  });
+
+  // User management routes (admin only)
+  app.get("/api/users", authenticateRequest, requireAdmin, async (_req, res) => {
+    try {
+      const allUsers = await storage.getUsers();
+      res.json(allUsers.map(u => ({ ...u, password: undefined })));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.get("/api/users/:id", authenticateRequest, async (req, res) => {
+    try {
+      const currentUser = (req as any).user;
+      
+      // Users can view their own profile, admins can view any profile
+      if (currentUser.role !== 'admin' && currentUser.id !== req.params.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const user = await storage.getUserById(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      res.json({ ...user, password: undefined });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
+  app.post("/api/users", authenticateRequest, requireAdmin, async (req, res) => {
+    try {
+      const validatedData = insertUserSchema.parse(req.body);
+      const user = await storage.createUser(validatedData);
+      res.status(201).json({ ...user, password: undefined });
+    } catch (error) {
+      res.status(400).json({ error: "Invalid user data" });
+    }
+  });
+
+  app.put("/api/users/:id", authenticateRequest, async (req, res) => {
+    try {
+      const currentUser = (req as any).user;
+      
+      // Users can update their own profile, admins can update any profile
+      if (currentUser.role !== 'admin' && currentUser.id !== req.params.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Only admins can change roles
+      if (req.body.role && currentUser.role !== 'admin') {
+        return res.status(403).json({ error: "Only admins can change user roles" });
+      }
+
+      const validatedData = insertUserSchema.partial().parse(req.body);
+      const user = await storage.updateUser(req.params.id, validatedData);
+      res.json({ ...user, password: undefined });
+    } catch (error) {
+      res.status(400).json({ error: "Invalid user data" });
+    }
+  });
+
+  app.delete("/api/users/:id", authenticateRequest, requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteUser(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
+  // User-Project assignment routes
+  app.get("/api/users/:userId/projects", authenticateRequest, async (req, res) => {
+    try {
+      const currentUser = (req as any).user;
+      
+      // Users can view their own projects, admins can view any user's projects
+      if (currentUser.role !== 'admin' && currentUser.id !== req.params.userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const userProjects = await storage.getUserProjects(req.params.userId);
+      res.json(userProjects);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch user projects" });
+    }
+  });
+
+  app.get("/api/projects/:projectId/users", authenticateRequest, async (req, res) => {
+    try {
+      const currentUser = (req as any).user;
+      
+      // Check if user has access to this project
+      const access = await storage.checkUserProjectAccess(currentUser.id, req.params.projectId);
+      if (!access && currentUser.role !== 'admin') {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const projectUsers = await storage.getProjectUsers(req.params.projectId);
+      res.json(projectUsers);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch project users" });
+    }
+  });
+
+  app.post("/api/projects/:projectId/users", authenticateRequest, async (req, res) => {
+    try {
+      const currentUser = (req as any).user;
+      
+      // Check if user has owner/editor access or is admin
+      const access = await storage.checkUserProjectAccess(currentUser.id, req.params.projectId);
+      if ((!access || (access.role !== 'owner' && access.role !== 'editor')) && currentUser.role !== 'admin') {
+        return res.status(403).json({ error: "Insufficient permissions" });
+      }
+
+      const validatedData = insertUserProjectSchema.parse({
+        ...req.body,
+        projectId: req.params.projectId,
+      });
+      
+      const userProject = await storage.addUserToProject(validatedData);
+      res.status(201).json(userProject);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid project user data" });
+    }
+  });
+
+  app.delete("/api/projects/:projectId/users/:userId", authenticateRequest, async (req, res) => {
+    try {
+      const currentUser = (req as any).user;
+      
+      // Check if user has owner access or is admin
+      const access = await storage.checkUserProjectAccess(currentUser.id, req.params.projectId);
+      if ((!access || access.role !== 'owner') && currentUser.role !== 'admin') {
+        return res.status(403).json({ error: "Only project owners can remove users" });
+      }
+
+      await storage.removeUserFromProject(req.params.userId, req.params.projectId);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to remove user from project" });
+    }
+  });
+  // Attributes routes (require authentication)
+  app.get("/api/attributes", authenticateRequest, async (_req, res) => {
     try {
       const attributes = await storage.getAttributes();
       res.json(attributes);

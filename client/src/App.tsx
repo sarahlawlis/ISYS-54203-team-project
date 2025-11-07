@@ -17,6 +17,10 @@ import Attributes from "@/pages/Attributes";
 import SearchPage from "@/pages/SearchPage";
 import SearchCreation from "@/pages/SearchCreation";
 import NotFound from "@/pages/not-found";
+import { auth } from "./lib/auth";
+import { useLocation } from "wouter";
+import { useEffect } from "react";
+import Login from "./pages/Login";
 
 function Router() {
   return (
@@ -37,10 +41,31 @@ function Router() {
 }
 
 export default function App() {
+  const [location, setLocation] = useLocation();
+  const isAuthenticated = auth.isAuthenticated();
+
+  useEffect(() => {
+    // Redirect to login if not authenticated and not already on login page
+    if (!isAuthenticated && location !== "/login") {
+      setLocation("/login");
+    }
+  }, [isAuthenticated, location, setLocation]);
+
   const style = {
-    "--sidebar-width": "16rem",
-    "--sidebar-width-icon": "3rem",
+    "--sidebar-width": "280px",
   };
+
+  // Show login page if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Login />
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+  }
 
   return (
     <QueryClientProvider client={queryClient}>

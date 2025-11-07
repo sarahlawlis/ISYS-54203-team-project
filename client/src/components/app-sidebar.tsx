@@ -5,6 +5,8 @@ import {
   Search,
   Library,
   Folder,
+  Users,
+  LogOut,
 } from "lucide-react";
 import {
   Sidebar,
@@ -16,8 +18,12 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
+  SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Link, useLocation } from "wouter";
+import { auth } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 const mainItems = [
   {
@@ -53,16 +59,29 @@ const mainItems = [
 ];
 
 export function AppSidebar() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
+  const { toast } = useToast();
+  const user = auth.getUser();
+  const isAdmin = auth.isAdmin();
+
+  const handleLogout = async () => {
+    try {
+      await auth.fetchWithAuth("/api/auth/logout", { method: "POST" });
+      auth.clearAuth();
+      setLocation("/login");
+      toast({ title: "Logged out successfully" });
+    } catch (error) {
+      toast({ title: "Error logging out", variant: "destructive" });
+    }
+  };
 
   return (
     <Sidebar>
-      <SidebarHeader className="p-4">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <GitBranch className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <span className="text-lg font-semibold">FlowForge</span>
+      <SidebarHeader className="border-b p-4">
+        <div className="space-y-1">
+          <p className="text-sm font-medium">{user?.username}</p>
+          <p className="text-xs text-muted-foreground">{user?.email}</p>
+          <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -83,7 +102,30 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Admin</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href="/users" data-testid="link-users">
+                      <Users />
+                      <span>User Management</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
+      <SidebarFooter className="border-t p-4">
+        <Button variant="outline" onClick={handleLogout} className="w-full">
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
+        </Button>
+      </SidebarFooter>
     </Sidebar>
   );
 }

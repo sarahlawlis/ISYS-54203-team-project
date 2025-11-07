@@ -1,76 +1,207 @@
 import { type User, type InsertUser, type Attribute, type InsertAttribute, type Workflow, type InsertWorkflow, type Project, type InsertProject, type ProjectForm, type InsertProjectForm, type ProjectWorkflow, type InsertProjectWorkflow, type FormSubmission, type InsertFormSubmission } from "@shared/schema";
 import * as schema from "@shared/schema";
-import { eq, sql as drizzleSql } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { attributes, workflows, projects, projectForms, projectWorkflows, formSubmissions } from "@shared/schema";
+import { attributes, workflows, projects, projectForms, projectWorkflows, formSubmissions, users, sessions, userProjects } from "@shared/schema";
+import crypto from 'crypto';
 
-// modify the interface with any CRUD methods
-// you might need
+// Helper function to hash passwords
+function hashPassword(password: string): string {
+  return crypto.createHash('sha256').update(password).digest('hex');
+}
+
+// Helper function to generate session token
+function generateToken(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
 
 export interface IStorage {
+  // User management
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  getUsers(): Promise<User[]>;
+  updateUser(id: string, user: Partial<InsertUser>): Promise<User>;
+  deleteUser(id: string): Promise<void>;
+  authenticateUser(credentials: schema.LoginUser): Promise<User | null>;
 
+  // Session management
+  createSession(userId: string): Promise<schema.Session>;
+  getSessionByToken(token: string): Promise<schema.Session | undefined>;
+  deleteSession(token: string): Promise<void>;
+
+  // Project access control
+  getUserProjects(userId: string): Promise<schema.UserProject[]>;
+  getProjectUsers(projectId: string): Promise<schema.UserProject[]>;
+  addUserToProject(userProject: schema.InsertUserProject): Promise<schema.UserProject>;
+  removeUserFromProject(userId: string, projectId: string): Promise<void>;
+  updateUserProjectRole(userId: string, projectId: string, role: 'owner' | 'editor' | 'viewer'): Promise<schema.UserProject>;
+  checkUserProjectAccess(userId: string, projectId: string): Promise<schema.UserProject | undefined>;
+
+  // Attribute management
   getAttributes(): Promise<Attribute[]>;
   getAttributeById(id: string): Promise<Attribute | undefined>;
   createAttribute(attribute: InsertAttribute): Promise<Attribute>;
   updateAttribute(id: string, attribute: InsertAttribute): Promise<Attribute | undefined>;
 
+  // Form management
   getForms(): Promise<schema.Form[]>;
   getFormById(id: string): Promise<schema.Form | undefined>;
   createForm(form: schema.InsertForm): Promise<schema.Form>;
   updateForm(id: string, form: Partial<schema.InsertForm>): Promise<schema.Form>;
   deleteForm(id: string): Promise<void>;
 
+  // Workflow management
   getWorkflows(): Promise<Workflow[]>;
   getWorkflowById(id: string): Promise<Workflow | undefined>;
   createWorkflow(workflow: InsertWorkflow): Promise<Workflow>;
   updateWorkflow(id: string, workflow: Partial<InsertWorkflow>): Promise<Workflow>;
   deleteWorkflow(id: string): Promise<void>;
 
+  // Project management
   getProjects(): Promise<Project[]>;
   getProjectById(id: string): Promise<Project | undefined>;
   createProject(project: InsertProject): Promise<Project>;
   updateProject(id: string, project: Partial<InsertProject>): Promise<Project>;
   deleteProject(id: string): Promise<void>;
 
+  // Project-Form relationships
   getProjectForms(projectId: string): Promise<ProjectForm[]>;
   addProjectForm(projectForm: InsertProjectForm): Promise<ProjectForm>;
   removeProjectForm(projectId: string, formId: string): Promise<void>;
 
+  // Project-Workflow relationships
   getProjectWorkflows(projectId: string): Promise<ProjectWorkflow[]>;
   addProjectWorkflow(projectWorkflow: InsertProjectWorkflow): Promise<ProjectWorkflow>;
   updateProjectWorkflow(id: string, projectWorkflow: Partial<InsertProjectWorkflow>): Promise<ProjectWorkflow>;
   removeProjectWorkflow(id: string): Promise<void>;
 
+  // Form submission management
   getFormSubmissions(projectId?: string): Promise<FormSubmission[]>;
   createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission>;
 }
 
 export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-
-  constructor() {
-    this.users = new Map();
-  }
-
+  // User management
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const hashedPassword = hashPassword(insertUser.password);
+    const [user] = await db.insert(users).values({
+      ...insertUser,
+      password: hashedPassword,
+    }).returning();
     return user;
+  }
+
+  async getUsers(): Promise<User[]> {
+    return await db.select().from(users);
+  }
+
+  async updateUser(id: string, data: Partial<InsertUser>): Promise<User> {
+    const updateData: any = { ...data };
+    if (data.password) {
+      updateData.password = hashPassword(data.password);
+    }
+    updateData.updatedAt = new Date();
+
+    const [user] = await db.update(users).set(updateData).where(eq(users.id, id)).returning();
+    return user;
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    await db.delete(users).where(eq(users.id, id));
+  }
+
+  async authenticateUser(credentials: schema.LoginUser): Promise<User | null> {
+    const hashedPassword = hashPassword(credentials.password);
+    const [user] = await db.select().from(users).where(
+      and(
+        eq(users.username, credentials.username),
+        eq(users.password, hashedPassword),
+        eq(users.isActive, true)
+      )
+    );
+    return user || null;
+  }
+
+  // Session management
+  async createSession(userId: string): Promise<schema.Session> {
+    const token = generateToken();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    const [session] = await db.insert(sessions).values({
+      userId,
+      token,
+      expiresAt,
+    }).returning();
+    return session;
+  }
+
+  async getSessionByToken(token: string): Promise<schema.Session | undefined> {
+    const [session] = await db.select().from(sessions).where(
+      and(
+        eq(sessions.token, token),
+        sql`${sessions.expiresAt} > NOW()`
+      )
+    );
+    return session;
+  }
+
+  async deleteSession(token: string): Promise<void> {
+    await db.delete(sessions).where(eq(sessions.token, token));
+  }
+
+  // User-Project assignments
+  async getUserProjects(userId: string): Promise<schema.UserProject[]> {
+    return await db.select().from(userProjects).where(eq(userProjects.userId, userId));
+  }
+
+  async getProjectUsers(projectId: string): Promise<schema.UserProject[]> {
+    return await db.select().from(userProjects).where(eq(userProjects.projectId, projectId));
+  }
+
+  async addUserToProject(data: schema.InsertUserProject): Promise<schema.UserProject> {
+    const [userProject] = await db.insert(userProjects).values(data).returning();
+    return userProject;
+  }
+
+  async removeUserFromProject(userId: string, projectId: string): Promise<void> {
+    await db.delete(userProjects).where(
+      and(
+        eq(userProjects.userId, userId),
+        eq(userProjects.projectId, projectId)
+      )
+    );
+  }
+
+  async updateUserProjectRole(userId: string, projectId: string, role: 'owner' | 'editor' | 'viewer'): Promise<schema.UserProject> {
+    const [userProject] = await db.update(userProjects).set({ role }).where(
+      and(
+        eq(userProjects.userId, userId),
+        eq(userProjects.projectId, projectId)
+      )
+    ).returning();
+    return userProject;
+  }
+
+  async checkUserProjectAccess(userId: string, projectId: string): Promise<schema.UserProject | undefined> {
+    const [userProject] = await db.select().from(userProjects).where(
+      and(
+        eq(userProjects.userId, userId),
+        eq(userProjects.projectId, projectId)
+      )
+    );
+    return userProject;
   }
 
   async getAttributes(): Promise<Attribute[]> {
@@ -177,6 +308,8 @@ export class MemStorage implements IStorage {
     await db.delete(projectForms).where(eq(projectForms.projectId, id));
     await db.delete(projectWorkflows).where(eq(projectWorkflows.projectId, id));
     await db.delete(formSubmissions).where(eq(formSubmissions.projectId, id));
+    // Also delete user-project assignments related to this project
+    await db.delete(userProjects).where(eq(userProjects.projectId, id));
     await db.delete(projects).where(eq(projects.id, id));
   }
 
