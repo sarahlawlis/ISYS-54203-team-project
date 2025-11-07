@@ -1,4 +1,3 @@
-import { useLocation } from "wouter";
 import {
   Table,
   TableBody,
@@ -30,8 +29,6 @@ interface ProjectsTableProps {
 }
 
 export function ProjectsTable({ projects }: ProjectsTableProps) {
-  const [, navigate] = useLocation();
-
   return (
     <div className="border rounded-card overflow-hidden">
       <Table>
@@ -48,12 +45,7 @@ export function ProjectsTable({ projects }: ProjectsTableProps) {
         </TableHeader>
         <TableBody>
           {projects.map((project) => (
-            <TableRow 
-              key={project.id} 
-              className="hover-elevate cursor-pointer" 
-              onClick={() => navigate(`/projects/${project.id}`)}
-              data-testid={`row-project-${project.id}`}
-            >
+            <TableRow key={project.id} className="hover-elevate" data-testid={`row-project-${project.id}`}>
               <TableCell className="font-medium">{project.name}</TableCell>
               <TableCell className="max-w-md truncate text-muted-foreground">
                 {project.description}
@@ -64,7 +56,7 @@ export function ProjectsTable({ projects }: ProjectsTableProps) {
               <TableCell className="text-muted-foreground">{project.dueDate}</TableCell>
               <TableCell className="text-muted-foreground">{project.teamSize}</TableCell>
               <TableCell className="text-muted-foreground">{project.activeWorkflows}</TableCell>
-              <TableCell onClick={(e) => e.stopPropagation()}>
+              <TableCell>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" data-testid={`button-project-menu-${project.id}`}>
@@ -72,10 +64,13 @@ export function ProjectsTable({ projects }: ProjectsTableProps) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={project.onEdit} data-testid={`button-edit-project-${project.id}`}>
+                    <DropdownMenuItem data-testid={`button-edit-project-${project.id}`}>
                       Edit
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive" onClick={project.onDelete} data-testid={`button-delete-project-${project.id}`}>
+                    <DropdownMenuItem data-testid={`button-archive-project-${project.id}`}>
+                      Archive
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="text-destructive" data-testid={`button-delete-project-${project.id}`}>
                       Delete
                     </DropdownMenuItem>
                   </DropdownMenuContent>

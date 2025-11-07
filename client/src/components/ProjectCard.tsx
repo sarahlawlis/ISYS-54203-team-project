@@ -1,4 +1,3 @@
-import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,8 +17,6 @@ export interface ProjectCardProps {
   dueDate: string;
   teamSize: number;
   activeWorkflows: number;
-  onEdit?: () => void;
-  onDelete?: () => void;
 }
 
 const statusColors = {
@@ -37,11 +34,7 @@ export function ProjectCard({
   dueDate,
   teamSize,
   activeWorkflows,
-  onEdit,
-  onDelete,
 }: ProjectCardProps) {
-  const [, navigate] = useLocation();
-
   return (
     <Card className="rounded-card hover-elevate" data-testid={`card-project-${id}`}>
       <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-3">
@@ -60,10 +53,13 @@ export function ProjectCard({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onEdit} data-testid={`button-edit-project-${id}`}>
+            <DropdownMenuItem data-testid={`button-edit-project-${id}`}>
               Edit Project
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive" onClick={onDelete} data-testid={`button-delete-project-${id}`}>
+            <DropdownMenuItem data-testid={`button-archive-project-${id}`}>
+              Archive
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive" data-testid={`button-delete-project-${id}`}>
               Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -90,7 +86,7 @@ export function ProjectCard({
             <span>{teamSize}</span>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${id}`)} data-testid={`button-view-project-${id}`}>
+        <Button variant="outline" size="sm" data-testid={`button-view-project-${id}`}>
           View
         </Button>
       </CardFooter>
