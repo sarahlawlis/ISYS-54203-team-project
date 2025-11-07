@@ -86,9 +86,10 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
     mutationFn: async (data: CreateProjectFormData) => {
       const { formIds, workflowIds, startWorkflows, ...projectData } = data;
       
+      // Ensure ownerId is set, fallback to empty string if user not available
       const projectRes = await apiRequest("POST", "/api/projects", {
         ...projectData,
-        ownerId: user?.id,
+        ownerId: user?.id || "",
       });
       const project = await projectRes.json();
 

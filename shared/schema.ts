@@ -130,6 +130,7 @@ export const insertProjectSchema = createInsertSchema(projects).omit({
   updatedAt: true,
 }).extend({
   status: z.enum(['planning', 'active', 'on-hold', 'completed']).default('planning'),
+  ownerId: z.string().optional(),
 });
 
 export type InsertProject = z.infer<typeof insertProjectSchema>;
