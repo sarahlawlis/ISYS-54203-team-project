@@ -2,7 +2,6 @@ import { ProjectCard } from "@/components/ProjectCard";
 import { ProjectsTable } from "@/components/ProjectsTable";
 import { ViewToggle, ViewMode } from "@/components/ViewToggle";
 import { CreateProjectDialog } from "@/components/CreateProjectDialog";
-import { EditProjectDialog } from "@/components/EditProjectDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,46 +13,17 @@ import {
 } from "@/components/ui/select";
 import { Plus, Search, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import type { Project, ProjectWorkflow, ProjectMember } from "@shared/schema";
+import { useQuery } from "@tanstack/react-query";
+import type { Project } from "@shared/schema";
 
 export default function Projects() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [view, setView] = useState<ViewMode>("cards");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const { toast } = useToast();
 
-  const { data: projects = [], isLoading: projectsLoading } = useQuery<Project[]>({
+  const { data: projects = [], isLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
-  });
-
-  const { data: allWorkflows = [], isLoading: workflowsLoading } = useQuery<ProjectWorkflow[]>({
-    queryKey: ["/api/project-workflows/all"],
-  });
-
-  const { data: allMembers = [], isLoading: membersLoading } = useQuery<ProjectMember[]>({
-    queryKey: ["/api/project-members/all"],
-  });
-
-  const isLoading = projectsLoading || workflowsLoading || membersLoading;
-
-  const projectsWithCounts = projects.map((project) => {
-    const workflows = allWorkflows.filter(w => w.projectId === project.id);
-    const members = allMembers.filter(m => m.projectId === project.id);
-    const totalWorkflows = workflows.length;
-    const activeWorkflows = workflows.filter(w => w.status === "running").length;
-
-    return {
-      ...project,
-      activeWorkflows,
-      totalWorkflows,
-      teamSize: members.length,
-    };
   });
 
   useEffect(() => {
@@ -66,52 +36,16 @@ export default function Projects() {
     localStorage.setItem("projects-view", newView);
   };
 
-  const filteredProjects = projectsWithCounts.filter((project) => {
+  const filteredProjects = projects.filter((project) => {
     const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || project.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  const deleteProjectMutation = useMutation({
-    mutationFn: async (projectId: string) => {
-      await apiRequest("DELETE", `/api/projects/${projectId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
-      toast({
-        title: "Project deleted",
-        description: "Project has been deleted successfully.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to delete project.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleEditProject = (project: Project) => {
-    setSelectedProject(project);
-    setEditDialogOpen(true);
-  };
-
-  const handleDeleteProject = (projectId: string) => {
-    if (confirm("Are you sure you want to delete this project?")) {
-      deleteProjectMutation.mutate(projectId);
-    }
-  };
-
   return (
     <>
       <CreateProjectDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
-      <EditProjectDialog 
-        project={selectedProject}
-        open={editDialogOpen}
-        onOpenChange={setEditDialogOpen}
-      />
       
       <div className="h-full overflow-auto">
         <div className="p-6 space-y-6">
@@ -164,7 +98,7 @@ export default function Projects() {
           ) : filteredProjects.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-muted-foreground">
-                {projectsWithCounts.length === 0
+                {projects.length === 0
                   ? "No projects yet. Create your first project to get started."
                   : "No projects match your search criteria."}
               </p>
@@ -179,10 +113,8 @@ export default function Projects() {
                   description={project.description || ""}
                   status={project.status as "active" | "planning" | "on-hold" | "completed"}
                   dueDate={project.dueDate || ""}
-                  teamSize={project.teamSize}
-                  activeWorkflows={project.activeWorkflows}
-                  onEdit={() => handleEditProject(project)}
-                  onDelete={() => handleDeleteProject(project.id)}
+                  teamSize={parseInt(project.teamSize) || 0}
+                  activeWorkflows={0}
                 />
               ))}
             </div>
@@ -194,10 +126,8 @@ export default function Projects() {
                 description: project.description || "",
                 status: project.status as "active" | "planning" | "on-hold" | "completed",
                 dueDate: project.dueDate || "",
-                teamSize: project.teamSize,
-                activeWorkflows: project.activeWorkflows,
-                onEdit: () => handleEditProject(project),
-                onDelete: () => handleDeleteProject(project.id),
+                teamSize: parseInt(project.teamSize) || 0,
+                activeWorkflows: 0,
               }))}
             />
           )}

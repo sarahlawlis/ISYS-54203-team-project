@@ -1,26 +1,10 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertAttributeSchema, insertFormSchema, insertWorkflowSchema, insertProjectSchema, insertProjectFormSchema, insertProjectWorkflowSchema, insertFormSubmissionSchema, insertRoleSchema, insertProjectMemberSchema, insertTaskSchema, insertTaskAssignmentSchema } from "@shared/schema";
+import { insertAttributeSchema, insertFormSchema, insertWorkflowSchema, insertProjectSchema, insertProjectFormSchema, insertProjectWorkflowSchema, insertFormSubmissionSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Set up authentication with Replit Auth
-  await setupAuth(app);
-
-  // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
-
-  // Attributes routes (protected)
+  // Attributes routes
   app.get("/api/attributes", async (_req, res) => {
     try {
       const attributes = await storage.getAttributes();
@@ -253,16 +237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Project Workflows routes
-  app.get("/api/project-workflows/all", isAuthenticated, async (req, res) => {
-    try {
-      const allWorkflows = await storage.getAllProjectWorkflows();
-      res.json(allWorkflows);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch all project workflows" });
-    }
-  });
-
-  app.get("/api/projects/:id/workflows", isAuthenticated, async (req, res) => {
+  app.get("/api/projects/:id/workflows", async (req, res) => {
     try {
       const projectWorkflows = await storage.getProjectWorkflows(req.params.id);
       res.json(projectWorkflows);
@@ -321,171 +296,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(submission);
     } catch (error) {
       res.status(400).json({ error: "Invalid form submission data" });
-    }
-  });
-
-  // Roles routes (protected)
-  app.get("/api/roles", isAuthenticated, async (_req, res) => {
-    try {
-      const roles = await storage.getRoles();
-      res.json(roles);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch roles" });
-    }
-  });
-
-  app.post("/api/roles", isAuthenticated, async (req, res) => {
-    try {
-      const validatedData = insertRoleSchema.parse(req.body);
-      const role = await storage.createRole(validatedData);
-      res.status(201).json(role);
-    } catch (error) {
-      res.status(400).json({ error: "Invalid role data" });
-    }
-  });
-
-  // User routes (protected)
-  app.get("/api/users/:id/roles", isAuthenticated, async (req, res) => {
-    try {
-      const roleIds = await storage.getUserRoles(req.params.id);
-      res.json(roleIds);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch user roles" });
-    }
-  });
-
-  app.get("/api/users/:id/projects", isAuthenticated, async (req, res) => {
-    try {
-      const projects = await storage.getUserProjects(req.params.id);
-      res.json(projects);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch user projects" });
-    }
-  });
-
-  app.get("/api/users/:id/tasks", isAuthenticated, async (req, res) => {
-    try {
-      const tasks = await storage.getUserTasks(req.params.id);
-      res.json(tasks);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch user tasks" });
-    }
-  });
-
-  // Project Members routes (protected)
-  app.get("/api/project-members/all", isAuthenticated, async (req, res) => {
-    try {
-      const allMembers = await storage.getAllProjectMembers();
-      res.json(allMembers);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch all project members" });
-    }
-  });
-
-  app.get("/api/projects/:id/members", isAuthenticated, async (req, res) => {
-    try {
-      const members = await storage.getProjectMembers(req.params.id);
-      res.json(members);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch project members" });
-    }
-  });
-
-  app.post("/api/projects/:id/members", isAuthenticated, async (req, res) => {
-    try {
-      const validatedData = insertProjectMemberSchema.parse({
-        ...req.body,
-        projectId: req.params.id,
-      });
-      const member = await storage.addProjectMember(validatedData);
-      res.status(201).json(member);
-    } catch (error) {
-      res.status(400).json({ error: "Invalid project member data" });
-    }
-  });
-
-  app.delete("/api/projects/:projectId/members/:userId", isAuthenticated, async (req, res) => {
-    try {
-      await storage.removeProjectMember(req.params.projectId, req.params.userId);
-      res.status(204).send();
-    } catch (error) {
-      res.status(500).json({ error: "Failed to remove project member" });
-    }
-  });
-
-  // Tasks routes (protected)
-  app.get("/api/tasks", isAuthenticated, async (req, res) => {
-    try {
-      const workflowId = req.query.workflowId as string | undefined;
-      const projectWorkflowId = req.query.projectWorkflowId as string | undefined;
-      const tasks = await storage.getTasks(workflowId, projectWorkflowId);
-      res.json(tasks);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch tasks" });
-    }
-  });
-
-  app.get("/api/tasks/:id", isAuthenticated, async (req, res) => {
-    try {
-      const task = await storage.getTaskById(req.params.id);
-      if (!task) {
-        return res.status(404).json({ error: "Task not found" });
-      }
-      res.json(task);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch task" });
-    }
-  });
-
-  app.post("/api/tasks", isAuthenticated, async (req, res) => {
-    try {
-      const validatedData = insertTaskSchema.parse(req.body);
-      const task = await storage.createTask(validatedData);
-      res.status(201).json(task);
-    } catch (error) {
-      res.status(400).json({ error: "Invalid task data" });
-    }
-  });
-
-  app.put("/api/tasks/:id", isAuthenticated, async (req, res) => {
-    try {
-      const validatedData = insertTaskSchema.partial().parse(req.body);
-      const task = await storage.updateTask(req.params.id, validatedData);
-      res.json(task);
-    } catch (error) {
-      res.status(400).json({ error: "Invalid task data" });
-    }
-  });
-
-  // Task Assignments routes (protected)
-  app.get("/api/tasks/:id/assignments", isAuthenticated, async (req, res) => {
-    try {
-      const assignments = await storage.getTaskAssignments(req.params.id);
-      res.json(assignments);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch task assignments" });
-    }
-  });
-
-  app.post("/api/tasks/:id/assignments", isAuthenticated, async (req, res) => {
-    try {
-      const validatedData = insertTaskAssignmentSchema.parse({
-        ...req.body,
-        taskId: req.params.id,
-      });
-      const assignment = await storage.assignTask(validatedData);
-      res.status(201).json(assignment);
-    } catch (error) {
-      res.status(400).json({ error: "Invalid task assignment data" });
-    }
-  });
-
-  app.delete("/api/tasks/:taskId/assignments/:userId", isAuthenticated, async (req, res) => {
-    try {
-      await storage.unassignTask(req.params.taskId, req.params.userId);
-      res.status(204).send();
-    } catch (error) {
-      res.status(500).json({ error: "Failed to remove task assignment" });
     }
   });
 

@@ -54,10 +54,6 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
   const [selectedForms, setSelectedForms] = useState<string[]>([]);
   const [selectedWorkflows, setSelectedWorkflows] = useState<string[]>([]);
 
-  const { data: user } = useQuery({
-    queryKey: ["/api/auth/user"],
-  });
-
   const { data: forms = [] } = useQuery<FormType[]>({
     queryKey: ["/api/forms"],
     enabled: open,
@@ -86,11 +82,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
     mutationFn: async (data: CreateProjectFormData) => {
       const { formIds, workflowIds, startWorkflows, ...projectData } = data;
       
-      // Ensure ownerId is set, fallback to empty string if user not available
-      const projectRes = await apiRequest("POST", "/api/projects", {
-        ...projectData,
-        ownerId: user?.id || "",
-      });
+      const projectRes = await apiRequest("POST", "/api/projects", projectData);
       const project = await projectRes.json();
 
       if (formIds && formIds.length > 0) {
@@ -136,15 +128,6 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
   });
 
   const handleSubmit = (data: CreateProjectFormData) => {
-    if (!user?.id) {
-      toast({
-        title: "Error",
-        description: "User not authenticated. Please refresh the page.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     createProjectMutation.mutate({
       ...data,
       formIds: selectedForms,
@@ -382,7 +365,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
               </Button>
               <Button
                 type="submit"
-                disabled={createProjectMutation.isPending || !user?.id}
+                disabled={createProjectMutation.isPending}
                 data-testid="button-submit-project"
               >
                 {createProjectMutation.isPending && (
