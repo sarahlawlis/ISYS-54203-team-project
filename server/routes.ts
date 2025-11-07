@@ -169,7 +169,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!project) {
         return res.status(404).json({ error: "Project not found" });
       }
-      res.json(project);
+
+      const [projectForms, projectWorkflows] = await Promise.all([
+        storage.getProjectForms(req.params.id),
+        storage.getProjectWorkflows(req.params.id),
+      ]);
+
+      const formIds = projectForms.map(pf => pf.formId);
+      const forms = await Promise.all(formIds.map(id => storage.getFormById(id)));
+
+      const workflowIds = projectWorkflows.map(pw => pw.workflowId);
+      const workflows = await Promise.all(workflowIds.map(id => storage.getWorkflowById(id)));
+
+      res.json({
+        ...project,
+        forms: forms.filter(f => f !== undefined),
+        workflows: workflows.filter(w => w !== undefined),
+        projectWorkflows,
+      });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch project" });
     }
@@ -187,8 +204,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/projects/:id", async (req, res) => {
     try {
-      const validatedData = insertProjectSchema.partial().parse(req.body);
+      const { formIds, workflowIds, ...projectData } = req.body;
+      const validatedData = insertProjectSchema.partial().parse(projectData);
       const project = await storage.updateProject(req.params.id, validatedData);
+
+      if (formIds !== undefined) {
+        const existingForms = await storage.getProjectForms(req.params.id);
+        const existingFormIds = existingForms.map(pf => pf.formId);
+        
+        const formsToAdd = formIds.filter((id: string) => !existingFormIds.includes(id));
+        const formsToRemove = existingFormIds.filter(id => !formIds.includes(id));
+        
+        await Promise.all([
+          ...formsToAdd.map((formId: string) => storage.addProjectForm({ projectId: req.params.id, formId })),
+          ...formsToRemove.map((formId: string) => storage.removeProjectForm(req.params.id, formId)),
+        ]);
+      }
+
+      if (workflowIds !== undefined) {
+        const existingWorkflows = await storage.getProjectWorkflows(req.params.id);
+        const existingWorkflowIds = existingWorkflows.map(pw => pw.workflowId);
+        
+        const workflowsToAdd = workflowIds.filter((id: string) => !existingWorkflowIds.includes(id));
+        const workflowsToRemove = existingWorkflows.filter(pw => !workflowIds.includes(pw.workflowId));
+        
+        await Promise.all([
+          ...workflowsToAdd.map((workflowId: string) => 
+            storage.addProjectWorkflow({ projectId: req.params.id, workflowId, status: 'pending' })
+          ),
+          ...workflowsToRemove.map(pw => storage.removeProjectWorkflow(pw.id)),
+        ]);
+      }
+
       res.json(project);
     } catch (error) {
       res.status(400).json({ error: "Invalid project data" });
