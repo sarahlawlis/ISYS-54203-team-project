@@ -7,6 +7,7 @@ import {
   Folder,
   Users,
   LogOut,
+  UserCog,
 } from "lucide-react";
 import {
   Sidebar,
@@ -120,8 +121,14 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
       </SidebarContent>
-      <SidebarFooter className="border-t p-4">
-        <Button variant="outline" onClick={handleLogout} className="w-full">
+      <SidebarFooter className="border-t p-4 space-y-2">
+        <Link href="/account">
+          <Button variant="outline" className="w-full" data-testid="button-account">
+            <UserCog className="mr-2 h-4 w-4" />
+            Account Settings
+          </Button>
+        </Link>
+        <Button variant="outline" onClick={handleLogout} className="w-full" data-testid="button-logout">
           <LogOut className="mr-2 h-4 w-4" />
           Logout
         </Button>

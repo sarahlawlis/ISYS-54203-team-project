@@ -14,6 +14,7 @@ import ProjectDetail from "./pages/ProjectDetail";
 import SearchPage from "./pages/SearchPage";
 import SearchCreation from "./pages/SearchCreation";
 import Login from "./pages/Login";
+import Account from "./pages/Account";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useEffect } from "react";
@@ -72,6 +73,7 @@ function Router() {
                 <Route path="/projects/:id" component={() => <ProtectedRoute component={ProjectDetail} />} />
                 <Route path="/search" component={() => <ProtectedRoute component={SearchPage} />} />
                 <Route path="/search/create" component={() => <ProtectedRoute component={SearchCreation} />} />
+                <Route path="/account" component={() => <ProtectedRoute component={Account} />} />
                 <Route component={NotFound} />
               </Switch>
             </main>

@@ -14,6 +14,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   getAllUsers(): Promise<User[]>;
   updateUserRole(id: string, role: string): Promise<User | undefined>;
+  updateUserPassword(id: string, password: string): Promise<User | undefined>;
 
   getAttributes(): Promise<Attribute[]>;
   getAttributeById(id: string): Promise<Attribute | undefined>;
@@ -74,6 +75,14 @@ export class MemStorage implements IStorage {
   async updateUserRole(id: string, role: string): Promise<User | undefined> {
     const [user] = await db.update(schema.users)
       .set({ role })
+      .where(eq(schema.users.id, id))
+      .returning();
+    return user;
+  }
+
+  async updateUserPassword(id: string, password: string): Promise<User | undefined> {
+    const [user] = await db.update(schema.users)
+      .set({ password })
       .where(eq(schema.users.id, id))
       .returning();
     return user;
