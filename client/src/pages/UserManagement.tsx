@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, UserPlus, Shield, User as UserIcon, Search, AlertTriangle, CheckCircle2, XCircle, UserX, UserCheck, KeyRound, History, Filter } from "lucide-react";
+import { Loader2, UserPlus, Shield, User as UserIcon, Search, AlertTriangle, CheckCircle2, XCircle, UserX, UserCheck, KeyRound, History, Filter, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { User } from "@shared/schema";
@@ -76,7 +76,7 @@ export default function UserManagement() {
   const [passwordResetDialog, setPasswordResetDialog] = useState<{ open: boolean; userId: string; username: string } | null>(null);
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [newRole, setNewRole] = useState<"admin" | "user">("user");
+  const [newRole, setNewRole] = useState<"admin" | "user" | "viewer">("user");
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -386,6 +386,7 @@ export default function UserManagement() {
                     <SelectItem value="all">All Roles</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="user">User</SelectItem>
+                    <SelectItem value="viewer">Viewer</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -429,11 +430,9 @@ export default function UserManagement() {
                         variant={user.role === "admin" ? "default" : "secondary"}
                         data-testid={`badge-role-${user.id}`}
                       >
-                        {user.role === "admin" ? (
-                          <Shield className="mr-1 h-3 w-3" />
-                        ) : (
-                          <UserIcon className="mr-1 h-3 w-3" />
-                        )}
+                        {user.role === "admin" && <Shield className="mr-1 h-3 w-3" />}
+                        {user.role === "user" && <UserIcon className="mr-1 h-3 w-3" />}
+                        {user.role === "viewer" && <Eye className="mr-1 h-3 w-3" />}
                         {user.role}
                       </Badge>
                     </TableCell>
@@ -469,8 +468,9 @@ export default function UserManagement() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="user">User</SelectItem>
                             <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="user">User</SelectItem>
+                            <SelectItem value="viewer">Viewer</SelectItem>
                           </SelectContent>
                         </Select>
                         <Button
@@ -571,17 +571,18 @@ export default function UserManagement() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="role">Role</Label>
-                <Select value={newRole} onValueChange={(value: "admin" | "user") => setNewRole(value)}>
+                <Select value={newRole} onValueChange={(value: "admin" | "user" | "viewer") => setNewRole(value)}>
                   <SelectTrigger data-testid="select-new-role">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="user">User</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="user">User</SelectItem>
+                    <SelectItem value="viewer">Viewer</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Admins can manage users and system settings
+                  Admins have full access, Users can manage their own projects, Viewers have read-only access
                 </p>
               </div>
             </div>
