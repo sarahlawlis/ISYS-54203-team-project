@@ -2,6 +2,7 @@ import { ProjectCard } from "@/components/ProjectCard";
 import { ProjectsTable } from "@/components/ProjectsTable";
 import { ViewToggle, ViewMode } from "@/components/ViewToggle";
 import { CreateProjectDialog } from "@/components/CreateProjectDialog";
+import { EditProjectDialog } from "@/components/EditProjectDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,14 +14,19 @@ import {
 } from "@/components/ui/select";
 import { Plus, Search, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import type { Project } from "@shared/schema";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { Project, ProjectWorkflow, ProjectMember } from "@shared/schema";
 
 export default function Projects() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [view, setView] = useState<ViewMode>("cards");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const { toast } = useToast();
 
   const { data: projects = [], isLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
@@ -43,9 +49,45 @@ export default function Projects() {
     return matchesSearch && matchesStatus;
   });
 
+  const deleteProjectMutation = useMutation({
+    mutationFn: async (projectId: string) => {
+      await apiRequest("DELETE", `/api/projects/${projectId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      toast({
+        title: "Project deleted",
+        description: "Project has been deleted successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete project.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEditProject = (project: Project) => {
+    setSelectedProject(project);
+    setEditDialogOpen(true);
+  };
+
+  const handleDeleteProject = (projectId: string) => {
+    if (confirm("Are you sure you want to delete this project?")) {
+      deleteProjectMutation.mutate(projectId);
+    }
+  };
+
   return (
     <>
       <CreateProjectDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
+      <EditProjectDialog 
+        project={selectedProject}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+      />
       
       <div className="h-full overflow-auto">
         <div className="p-6 space-y-6">
@@ -115,6 +157,8 @@ export default function Projects() {
                   dueDate={project.dueDate || ""}
                   teamSize={parseInt(project.teamSize) || 0}
                   activeWorkflows={0}
+                  onEdit={() => handleEditProject(project)}
+                  onDelete={() => handleDeleteProject(project.id)}
                 />
               ))}
             </div>
@@ -128,6 +172,8 @@ export default function Projects() {
                 dueDate: project.dueDate || "",
                 teamSize: parseInt(project.teamSize) || 0,
                 activeWorkflows: 0,
+                onEdit: () => handleEditProject(project),
+                onDelete: () => handleDeleteProject(project.id),
               }))}
             />
           )}

@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import Projects from "@/pages/Projects";
+import ProjectDetail from "@/pages/ProjectDetail";
 import Workflows from "@/pages/Workflows";
 import WorkflowDesigner from "@/pages/WorkflowDesigner";
 import Forms from "@/pages/Forms";
@@ -34,6 +35,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/projects/:id" component={ProjectDetail} />
       <Route path="/projects" component={Projects} />
       <Route path="/workflows/:id" component={WorkflowDesigner} />
       <Route path="/workflows" component={Workflows} />
