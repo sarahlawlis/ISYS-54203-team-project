@@ -63,10 +63,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
+      if (user.isActive === 'false') {
+        return res.status(403).json({ error: "Account is deactivated" });
+      }
+
       const isValid = await verifyPassword(validatedData.password, user.password);
       if (!isValid) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
+
+      await storage.updateUserLastLogin(user.id);
 
       req.session.userId = user.id;
       res.json(sanitizeUser(user));
@@ -140,6 +146,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/users/:id/role", requireAdmin, async (req, res) => {
     try {
+      if (req.session.userId === req.params.id) {
+        return res.status(403).json({ error: "You cannot change your own role" });
+      }
+
       const { role } = req.body;
       if (role !== 'admin' && role !== 'user') {
         return res.status(400).json({ error: "Invalid role" });
@@ -169,11 +179,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.createUser({
         ...validatedData,
         password: hashedPassword,
+        createdBy: req.session.userId,
       });
 
       res.status(201).json(sanitizeUser(user));
-    } catch (error) {
+    } catch (error: any) {
+      if (error.errors) {
+        const messages = error.errors.map((e: any) => e.message).join(", ");
+        return res.status(400).json({ error: messages });
+      }
       res.status(400).json({ error: "Invalid user data" });
+    }
+  });
+
+  app.put("/api/users/:id/active", requireAdmin, async (req, res) => {
+    try {
+      if (req.session.userId === req.params.id) {
+        return res.status(403).json({ error: "You cannot change your own account status" });
+      }
+
+      const { isActive } = req.body;
+      if (typeof isActive !== 'boolean') {
+        return res.status(400).json({ error: "isActive must be a boolean" });
+      }
+
+      const user = await storage.updateUserActiveStatus(req.params.id, isActive);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      res.json(sanitizeUser(user));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update user status" });
     }
   });
 

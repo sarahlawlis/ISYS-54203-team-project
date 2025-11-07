@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, UserPlus, Shield, User as UserIcon } from "lucide-react";
+import { Loader2, UserPlus, Shield, User as UserIcon, Search, AlertTriangle, CheckCircle2, XCircle, UserX, UserCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { User } from "@shared/schema";
@@ -15,6 +15,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -32,13 +42,52 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Progress } from "@/components/ui/progress";
+
+function calculatePasswordStrength(password: string): { strength: number; label: string; color: string } {
+  let strength = 0;
+  
+  if (password.length >= 8) strength += 25;
+  if (password.length >= 12) strength += 15;
+  if (/[a-z]/.test(password)) strength += 15;
+  if (/[A-Z]/.test(password)) strength += 15;
+  if (/[0-9]/.test(password)) strength += 15;
+  if (/[^a-zA-Z0-9]/.test(password)) strength += 15;
+  
+  let label = "Weak";
+  let color = "bg-red-500";
+  
+  if (strength >= 75) {
+    label = "Strong";
+    color = "bg-green-500";
+  } else if (strength >= 50) {
+    label = "Medium";
+    color = "bg-yellow-500";
+  }
+  
+  return { strength, label, color };
+}
 
 export default function UserManagement() {
   const { toast } = useToast();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [roleChangeDialog, setRoleChangeDialog] = useState<{ open: boolean; userId: string; newRole: string } | null>(null);
+  const [statusChangeDialog, setStatusChangeDialog] = useState<{ open: boolean; userId: string; newStatus: boolean } | null>(null);
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState<"admin" | "user">("user");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const { data: currentUser } = useQuery<User>({
+    queryKey: ["/api/auth/me"],
+    queryFn: async () => {
+      const response = await fetch("/api/auth/me", {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to fetch current user");
+      return response.json();
+    },
+  });
 
   const { data: users, isLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
@@ -53,9 +102,22 @@ export default function UserManagement() {
     },
   });
 
+  const filteredUsers = useMemo(() => {
+    if (!users) return [];
+    if (!searchQuery) return users;
+    
+    return users.filter(user =>
+      user.username.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [users, searchQuery]);
+
   const createUserMutation = useMutation({
     mutationFn: async (userData: { username: string; password: string; role: string }) => {
       const response = await apiRequest("POST", "/api/users", userData);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to create user");
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -81,6 +143,10 @@ export default function UserManagement() {
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
       const response = await apiRequest("PUT", `/api/users/${userId}/role`, { role });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to update role");
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -99,13 +165,56 @@ export default function UserManagement() {
     },
   });
 
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ userId, isActive }: { userId: string; isActive: boolean }) => {
+      const response = await apiRequest("PUT", `/api/users/${userId}/active`, { isActive });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to update status");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({
+        title: "Success",
+        description: "User status updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user status",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (newPassword.length < 6) {
+    if (!/^[a-zA-Z0-9_-]+$/.test(newUsername)) {
       toast({
-        title: "Error",
-        description: "Password must be at least 6 characters",
+        title: "Invalid Username",
+        description: "Username can only contain letters, numbers, underscores, and hyphens",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (newUsername.length < 3 || newUsername.length > 20) {
+      toast({
+        title: "Invalid Username",
+        description: "Username must be between 3 and 20 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (newPassword.length < 8) {
+      toast({
+        title: "Weak Password",
+        description: "Password must be at least 8 characters",
         variant: "destructive",
       });
       return;
@@ -119,8 +228,51 @@ export default function UserManagement() {
   };
 
   const handleRoleChange = (userId: string, newRole: string) => {
-    updateRoleMutation.mutate({ userId, role: newRole });
+    if (currentUser?.id === userId) {
+      toast({
+        title: "Action Denied",
+        description: "You cannot change your own role",
+        variant: "destructive",
+      });
+      return;
+    }
+    setRoleChangeDialog({ open: true, userId, newRole });
   };
+
+  const confirmRoleChange = () => {
+    if (roleChangeDialog) {
+      updateRoleMutation.mutate({
+        userId: roleChangeDialog.userId,
+        role: roleChangeDialog.newRole,
+      });
+      setRoleChangeDialog(null);
+    }
+  };
+
+  const handleStatusChange = (userId: string, currentStatus: string) => {
+    if (currentUser?.id === userId) {
+      toast({
+        title: "Action Denied",
+        description: "You cannot deactivate your own account",
+        variant: "destructive",
+      });
+      return;
+    }
+    const newStatus = currentStatus === 'true' ? false : true;
+    setStatusChangeDialog({ open: true, userId, newStatus });
+  };
+
+  const confirmStatusChange = () => {
+    if (statusChangeDialog) {
+      updateStatusMutation.mutate({
+        userId: statusChangeDialog.userId,
+        isActive: statusChangeDialog.newStatus,
+      });
+      setStatusChangeDialog(null);
+    }
+  };
+
+  const passwordStrength = useMemo(() => calculatePasswordStrength(newPassword), [newPassword]);
 
   if (isLoading) {
     return (
@@ -133,11 +285,11 @@ export default function UserManagement() {
   return (
     <div className="container mx-auto p-6">
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-3xl font-bold">User Management</h1>
             <p className="text-muted-foreground mt-1">
-              Manage user accounts and permissions
+              Manage user accounts and permissions securely
             </p>
           </div>
           <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-user">
@@ -148,10 +300,25 @@ export default function UserManagement() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Users</CardTitle>
-            <CardDescription>
-              {users?.length || 0} total users
-            </CardDescription>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <CardTitle>Users</CardTitle>
+                <CardDescription>
+                  {filteredUsers.length} {filteredUsers.length === 1 ? 'user' : 'users'} 
+                  {searchQuery && ` matching "${searchQuery}"`}
+                </CardDescription>
+              </div>
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search users..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-search-users"
+                />
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <Table>
@@ -159,15 +326,22 @@ export default function UserManagement() {
                 <TableRow>
                   <TableHead>Username</TableHead>
                   <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Last Login</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users?.map((user) => (
+                {filteredUsers.map((user) => (
                   <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
                     <TableCell className="font-medium" data-testid={`text-username-${user.id}`}>
-                      {user.username}
+                      <div className="flex items-center gap-2">
+                        {user.username}
+                        {currentUser?.id === user.id && (
+                          <Badge variant="outline" className="text-xs">You</Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -182,23 +356,62 @@ export default function UserManagement() {
                         {user.role}
                       </Badge>
                     </TableCell>
-                    <TableCell data-testid={`text-created-${user.id}`}>
+                    <TableCell data-testid={`status-${user.id}`}>
+                      <Badge variant={user.isActive === 'true' ? "default" : "secondary"}>
+                        {user.isActive === 'true' ? (
+                          <>
+                            <CheckCircle2 className="mr-1 h-3 w-3" />
+                            Active
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="mr-1 h-3 w-3" />
+                            Inactive
+                          </>
+                        )}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground" data-testid={`last-login-${user.id}`}>
+                      {user.lastLogin ? new Date(user.lastLogin).toLocaleString() : "Never"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground" data-testid={`text-created-${user.id}`}>
                       {new Date(user.createdAt).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Select
-                        value={user.role}
-                        onValueChange={(value) => handleRoleChange(user.id, value)}
-                        disabled={updateRoleMutation.isPending}
-                      >
-                        <SelectTrigger className="w-32" data-testid={`select-role-${user.id}`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="user">User</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="flex justify-end gap-2">
+                        <Select
+                          value={user.role}
+                          onValueChange={(value) => handleRoleChange(user.id, value)}
+                          disabled={updateRoleMutation.isPending || currentUser?.id === user.id}
+                        >
+                          <SelectTrigger className="w-28" data-testid={`select-role-${user.id}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="user">User</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant={user.isActive === 'true' ? "outline" : "default"}
+                          size="sm"
+                          onClick={() => handleStatusChange(user.id, user.isActive)}
+                          disabled={updateStatusMutation.isPending || currentUser?.id === user.id}
+                          data-testid={`button-toggle-status-${user.id}`}
+                        >
+                          {user.isActive === 'true' ? (
+                            <>
+                              <UserX className="mr-1 h-3 w-3" />
+                              Deactivate
+                            </>
+                          ) : (
+                            <>
+                              <UserCheck className="mr-1 h-3 w-3" />
+                              Activate
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -209,11 +422,11 @@ export default function UserManagement() {
       </div>
 
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent data-testid="dialog-create-user">
+        <DialogContent data-testid="dialog-create-user" className="max-w-md">
           <DialogHeader>
             <DialogTitle>Create New User</DialogTitle>
             <DialogDescription>
-              Add a new user account to the system
+              Add a new user account with secure credentials
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreateUser}>
@@ -225,8 +438,15 @@ export default function UserManagement() {
                   value={newUsername}
                   onChange={(e) => setNewUsername(e.target.value)}
                   required
+                  minLength={3}
+                  maxLength={20}
+                  pattern="[a-zA-Z0-9_-]+"
                   data-testid="input-new-username"
+                  placeholder="john_doe"
                 />
+                <p className="text-xs text-muted-foreground">
+                  3-20 characters, letters, numbers, underscores, and hyphens only
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
@@ -236,11 +456,27 @@ export default function UserManagement() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
-                  minLength={6}
+                  minLength={8}
                   data-testid="input-new-password"
+                  placeholder="Enter secure password"
                 />
+                {newPassword && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Password strength:</span>
+                      <span className={`font-medium ${
+                        passwordStrength.strength >= 75 ? 'text-green-600 dark:text-green-400' :
+                        passwordStrength.strength >= 50 ? 'text-yellow-600 dark:text-yellow-400' :
+                        'text-red-600 dark:text-red-400'
+                      }`}>
+                        {passwordStrength.label}
+                      </span>
+                    </div>
+                    <Progress value={passwordStrength.strength} className="h-2" />
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">
-                  Must be at least 6 characters
+                  Minimum 8 characters. Include uppercase, lowercase, numbers, and symbols for best security.
                 </p>
               </div>
               <div className="space-y-2">
@@ -254,13 +490,21 @@ export default function UserManagement() {
                     <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Admins can manage users and system settings
+                </p>
               </div>
             </div>
             <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setCreateDialogOpen(false)}
+                onClick={() => {
+                  setCreateDialogOpen(false);
+                  setNewUsername("");
+                  setNewPassword("");
+                  setNewRole("user");
+                }}
                 data-testid="button-cancel-create"
               >
                 Cancel
@@ -283,6 +527,48 @@ export default function UserManagement() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={roleChangeDialog?.open || false} onOpenChange={(open) => !open && setRoleChangeDialog(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500" />
+              Confirm Role Change
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to change this user's role to <strong>{roleChangeDialog?.newRole}</strong>? 
+              This will {roleChangeDialog?.newRole === 'admin' ? 'grant them full system access' : 'remove their admin privileges'}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-role-change">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRoleChange} data-testid="button-confirm-role-change">
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={statusChangeDialog?.open || false} onOpenChange={(open) => !open && setStatusChangeDialog(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500" />
+              Confirm Status Change
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to {statusChangeDialog?.newStatus ? 'activate' : 'deactivate'} this user account?
+              {!statusChangeDialog?.newStatus && ' They will not be able to log in until reactivated.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-status-change">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmStatusChange} data-testid="button-confirm-status-change">
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

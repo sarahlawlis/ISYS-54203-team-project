@@ -11,10 +11,12 @@ import { attributes, workflows, projects, projectForms, projectWorkflows, formSu
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  createUser(user: InsertUser & { createdBy?: string }): Promise<User>;
   getAllUsers(): Promise<User[]>;
   updateUserRole(id: string, role: string): Promise<User | undefined>;
   updateUserPassword(id: string, password: string): Promise<User | undefined>;
+  updateUserLastLogin(id: string): Promise<User | undefined>;
+  updateUserActiveStatus(id: string, isActive: boolean): Promise<User | undefined>;
 
   getAttributes(): Promise<Attribute[]>;
   getAttributeById(id: string): Promise<Attribute | undefined>;
@@ -63,7 +65,7 @@ export class MemStorage implements IStorage {
     return user;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
+  async createUser(insertUser: InsertUser & { createdBy?: string }): Promise<User> {
     const [user] = await db.insert(schema.users).values(insertUser).returning();
     return user;
   }
@@ -83,6 +85,22 @@ export class MemStorage implements IStorage {
   async updateUserPassword(id: string, password: string): Promise<User | undefined> {
     const [user] = await db.update(schema.users)
       .set({ password })
+      .where(eq(schema.users.id, id))
+      .returning();
+    return user;
+  }
+
+  async updateUserLastLogin(id: string): Promise<User | undefined> {
+    const [user] = await db.update(schema.users)
+      .set({ lastLogin: drizzleSql`CURRENT_TIMESTAMP` })
+      .where(eq(schema.users.id, id))
+      .returning();
+    return user;
+  }
+
+  async updateUserActiveStatus(id: string, isActive: boolean): Promise<User | undefined> {
+    const [user] = await db.update(schema.users)
+      .set({ isActive: isActive ? 'true' : 'false' })
       .where(eq(schema.users.id, id))
       .returning();
     return user;
