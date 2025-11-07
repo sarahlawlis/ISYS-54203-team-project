@@ -64,6 +64,8 @@ export function AppSidebar() {
   const { toast } = useToast();
   const user = auth.getUser();
   const isAdmin = auth.isAdmin();
+  const isUser = user?.role === 'user';
+  const isViewer = user?.role === 'viewer';
 
   const handleLogout = async () => {
     try {
@@ -75,6 +77,17 @@ export function AppSidebar() {
       toast({ title: "Error logging out", variant: "destructive" });
     }
   };
+
+  const visibleMainItems = mainItems.filter(item => {
+    if (isAdmin) return true;
+    if (isViewer) {
+      return item.title === 'Projects' || item.title === 'Search';
+    }
+    if (isUser) {
+      return true;
+    }
+    return false;
+  });
 
   return (
     <Sidebar>
@@ -90,7 +103,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Platform</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainItems.map((item) => (
+              {visibleMainItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={location === item.url}>
                     <Link href={item.url} data-testid={`link-${item.title.toLowerCase()}`}>
