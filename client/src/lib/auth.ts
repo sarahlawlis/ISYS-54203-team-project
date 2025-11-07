@@ -22,7 +22,15 @@ export const auth = {
 
   getUser(): AuthUser | null {
     const userJson = localStorage.getItem(USER_STORAGE_KEY);
-    return userJson ? JSON.parse(userJson) : null;
+    if (!userJson) return null;
+    
+    try {
+      return JSON.parse(userJson);
+    } catch (error) {
+      localStorage.removeItem(USER_STORAGE_KEY);
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      return null;
+    }
   },
 
   setAuth(token: string, user: AuthUser): void {
