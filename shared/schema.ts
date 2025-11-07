@@ -7,7 +7,7 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").notNull().default('user'), // 'admin' or 'user'
+  role: text("role").notNull().default('user'), // 'admin', 'user', or 'viewer'
   isActive: text("is_active").notNull().default('true'),
   lastLogin: text("last_login"),
   createdBy: varchar("created_by"),
@@ -21,6 +21,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
 }).extend({
   username: z.string().min(3).max(20).regex(/^[a-zA-Z0-9_-]+$/, "Username can only contain letters, numbers, underscores, and hyphens"),
   password: z.string().min(8, "Password must be at least 8 characters"),
+  role: z.enum(['admin', 'user', 'viewer']).default('user'),
 });
 
 export const loginUserSchema = z.object({
@@ -90,6 +91,7 @@ export const projects = pgTable("projects", {
   status: text("status").notNull().default('planning'),
   dueDate: text("due_date"),
   teamSize: text("team_size").notNull().default('0'),
+  ownerId: varchar("owner_id").notNull(),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
