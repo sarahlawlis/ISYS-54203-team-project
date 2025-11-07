@@ -38,12 +38,12 @@ export default function Login() {
         throw new Error(error.error || "Authentication failed");
       }
 
-      const data = await response.json();
-      auth.setAuth(data.token, data.user);
+      const user = await response.json();
+      auth.setAuth("", user);
 
       toast({
         title: isLogin ? "Login successful" : "Account created",
-        description: `Welcome, ${data.user.username}!`,
+        description: `Welcome, ${user.username}!`,
       });
 
       setLocation("/");
