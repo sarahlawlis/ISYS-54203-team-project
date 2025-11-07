@@ -1,158 +1,245 @@
-import { StatsCard } from "@/components/StatsCard";
-import { ProjectCard } from "@/components/ProjectCard";
-import { TaskCard } from "@/components/TaskCard";
-import { SavedSearchCard } from "@/components/SavedSearchCard";
+import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Plus, Folder, GitBranch, CheckCircle2, Clock } from "lucide-react";
-
-//todo: remove mock functionality
-const mockProjects = [
-  {
-    id: "1",
-    name: "Customer Onboarding System",
-    description: "Streamline new customer intake with automated workflows",
-    status: "active" as const,
-    dueDate: "Dec 15, 2024",
-    teamSize: 5,
-    activeWorkflows: 3,
-  },
-  {
-    id: "2",
-    name: "Product Launch Campaign",
-    description: "Marketing workflow for Q1 product release",
-    status: "planning" as const,
-    dueDate: "Jan 20, 2025",
-    teamSize: 8,
-    activeWorkflows: 2,
-  },
-  {
-    id: "3",
-    name: "Employee Training Portal",
-    description: "Onboarding and continuous learning platform",
-    status: "active" as const,
-    dueDate: "Dec 30, 2024",
-    teamSize: 4,
-    activeWorkflows: 5,
-  },
-];
-
-const mockTasks = [
-  {
-    id: "1",
-    title: "Review documentation requirements",
-    project: "Customer Onboarding",
-    assignee: "Sarah Johnson",
-    dueDate: "Dec 12",
-    priority: "high" as const,
-    status: "in-progress" as const,
-  },
-  {
-    id: "2",
-    title: "Setup access credentials",
-    project: "Customer Onboarding",
-    assignee: "Mike Chen",
-    dueDate: "Dec 15",
-    priority: "medium" as const,
-    status: "pending" as const,
-  },
-];
-
-const mockSavedSearches = [
-  {
-    id: "1",
-    name: "High Priority Active Projects",
-    filters: "type:project, priority:high, status:active",
-    resultCount: 12,
-  },
-  {
-    id: "2",
-    name: "Overdue Tasks",
-    filters: "type:task, dueDate:<today",
-    resultCount: 5,
-  },
-];
+import type { Project, Task } from "@shared/schema";
+import { CheckCircle2, Clock, FolderOpen, ListTodo, TrendingUp } from "lucide-react";
 
 export default function Dashboard() {
+  const { user, isLoading: authLoading } = useAuth();
+
+  const { data: userProjects = [], isLoading: projectsLoading } = useQuery<Project[]>({
+    queryKey: ["/api/users", user?.id, "projects"],
+    enabled: !!user?.id,
+  });
+
+  const { data: userTasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
+    queryKey: ["/api/users", user?.id, "tasks"],
+    enabled: !!user?.id,
+  });
+
+  if (authLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-muted-foreground">Loading your dashboard...</div>
+        </div>
+      </div>
+    );
+  }
+
+  const pendingTasks = userTasks.filter(t => t.status === "pending");
+  const inProgressTasks = userTasks.filter(t => t.status === "in-progress");
+  const completedTasks = userTasks.filter(t => t.status === "completed");
+  const activeProjects = userProjects.filter(p => p.status === "active");
+
   return (
     <div className="h-full overflow-auto">
       <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-semibold">Dashboard</h1>
-            <p className="text-muted-foreground mt-1">
-              Welcome back! Here's your project overview
-            </p>
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-4">
+            <Avatar className="h-16 w-16" data-testid="avatar-user">
+              <AvatarImage src={user?.profileImageUrl || undefined} alt={user?.email || "User"} style={{ objectFit: 'cover' }} />
+              <AvatarFallback>
+                {user?.firstName?.[0]}{user?.lastName?.[0] || user?.email?.[0]?.toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <h1 className="text-2xl font-semibold" data-testid="text-welcome">
+                Welcome back, {user?.firstName || user?.email}!
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                Here's what's happening with your projects and tasks
+              </p>
+            </div>
           </div>
-          <Button data-testid="button-new-project">
-            <Plus className="h-4 w-4 mr-2" />
-            New Project
+          <Button
+            variant="outline"
+            onClick={() => window.location.href = "/api/logout"}
+            data-testid="button-logout"
+          >
+            Log Out
           </Button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatsCard
-            title="Active Projects"
-            value={24}
-            icon={Folder}
-            trend={{ value: 12, direction: "up" }}
-            subtitle="Across all teams"
-          />
-          <StatsCard
-            title="Workflows"
-            value={47}
-            icon={GitBranch}
-            subtitle="Ready to use"
-          />
-          <StatsCard
-            title="Completed Tasks"
-            value={156}
-            icon={CheckCircle2}
-            trend={{ value: 8, direction: "up" }}
-            subtitle="This month"
-          />
-          <StatsCard
-            title="Pending Tasks"
-            value={23}
-            icon={Clock}
-            trend={{ value: 5, direction: "down" }}
-            subtitle="Due this week"
-          />
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Active Projects
+              </CardTitle>
+              <FolderOpen className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-active-projects">{activeProjects.length}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {userProjects.length} total projects
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Pending Tasks
+              </CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-pending-tasks">{pendingTasks.length}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Waiting to be started
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                In Progress
+              </CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-in-progress-tasks">{inProgressTasks.length}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Currently working on
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Completed
+              </CardTitle>
+              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-completed-tasks">{completedTasks.length}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Tasks finished
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Recent Projects</h2>
-              <Button variant="outline" size="sm" data-testid="button-view-all-projects">
-                View All
-              </Button>
-            </div>
-            <div className="grid gap-4">
-              {mockProjects.map((project) => (
-                <ProjectCard key={project.id} {...project} />
-              ))}
-            </div>
-          </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ListTodo className="h-5 w-5" />
+                My Tasks
+              </CardTitle>
+              <CardDescription>Tasks assigned to you</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {tasksLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              ) : userTasks.length === 0 ? (
+                <p className="text-muted-foreground text-sm py-8 text-center" data-testid="text-no-tasks">
+                  No tasks assigned yet. Check with your project manager.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {userTasks.slice(0, 5).map((task) => (
+                    <div
+                      key={task.id}
+                      className="flex items-start justify-between p-3 rounded-md border hover-elevate"
+                      data-testid={`task-${task.id}`}
+                    >
+                      <div className="flex-1">
+                        <div className="font-medium">{task.name}</div>
+                        {task.description && (
+                          <div className="text-sm text-muted-foreground mt-1">
+                            {task.description}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-2 ml-4">
+                        <Badge
+                          variant={
+                            task.status === "completed"
+                              ? "default"
+                              : task.status === "in-progress"
+                              ? "secondary"
+                              : "outline"
+                          }
+                        >
+                          {task.status}
+                        </Badge>
+                        {task.priority && (
+                          <Badge variant="outline" className="text-xs">
+                            {task.priority}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-lg font-semibold mb-4">My Tasks</h2>
-              <div className="space-y-3">
-                {mockTasks.map((task) => (
-                  <TaskCard key={task.id} {...task} />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Saved Searches</h2>
-              <div className="space-y-3">
-                {mockSavedSearches.map((search) => (
-                  <SavedSearchCard key={search.id} {...search} />
-                ))}
-              </div>
-            </div>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FolderOpen className="h-5 w-5" />
+                My Projects
+              </CardTitle>
+              <CardDescription>Projects you're part of</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {projectsLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              ) : userProjects.length === 0 ? (
+                <p className="text-muted-foreground text-sm py-8 text-center" data-testid="text-no-projects">
+                  No projects yet. Ask your manager to add you to a project.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {userProjects.slice(0, 5).map((project) => (
+                    <div
+                      key={project.id}
+                      className="flex items-start justify-between p-3 rounded-md border hover-elevate"
+                      data-testid={`project-${project.id}`}
+                    >
+                      <div className="flex-1">
+                        <div className="font-medium">{project.name}</div>
+                        {project.description && (
+                          <div className="text-sm text-muted-foreground mt-1">
+                            {project.description}
+                          </div>
+                        )}
+                      </div>
+                      <Badge
+                        variant={
+                          project.status === "active"
+                            ? "default"
+                            : project.status === "completed"
+                            ? "secondary"
+                            : "outline"
+                        }
+                      >
+                        {project.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
