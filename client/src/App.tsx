@@ -103,7 +103,7 @@ export default function App() {
                 <SidebarTrigger data-testid="button-sidebar-toggle" />
                 <ThemeToggle />
               </header>
-              <main className="flex-1 overflow-hidden">
+              <main className="flex-1 overflow-auto">
                 <Router />
               </main>
             </div>
