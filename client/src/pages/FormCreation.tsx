@@ -364,7 +364,7 @@ export default function FormCreation() {
       <div className="flex-1 overflow-hidden flex">
         {/* Left Panel - Attribute Library */}
         <div className="w-72 border-r bg-card flex flex-col">
-          <div className="p-4 border-b flex-1 overflow-hidden flex flex-col">
+          <div className="p-4 border-b flex-shrink-0">
             <h3 className="font-semibold mb-4">Attribute Library</h3>
             <div className="relative mb-3">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -375,7 +375,9 @@ export default function FormCreation() {
                 onChange={(e) => setAttributeSearch(e.target.value)}
               />
             </div>
-            <div className="space-y-2 overflow-auto flex-1">
+          </div>
+          <div className="flex-1 overflow-auto p-4">
+            <div className="space-y-2">
               {availableAttributes
                 .sort((a, b) => a.name.localeCompare(b.name))
                 .filter((attr) => 
