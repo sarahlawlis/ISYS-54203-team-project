@@ -88,7 +88,7 @@ export default function Forms() {
               Create and manage custom forms for projects and tasks
             </p>
           </div>
-          <Button onClick={() => setLocation("/forms/new")} data-testid="button-create-form">
+          <Button onClick={() => setLocation("/forms/create")} data-testid="button-create-form">
             <Plus className="h-4 w-4 mr-2" />
             Create Form
           </Button>
@@ -153,7 +153,7 @@ export default function Forms() {
                               attributes: []
                             }));
                           }
-                          setLocation(`/forms/new?formId=${form.id}`);
+                          setLocation(`/forms/create?formId=${form.id}`);
                         }}
                         data-testid={`button-edit-form-${form.id}`}
                       >
@@ -193,7 +193,7 @@ export default function Forms() {
                           attributes: []
                         }));
                       }
-                      setLocation(`/forms/new?formId=${form.id}`);
+                      setLocation(`/forms/create?formId=${form.id}`);
                     }}
                     data-testid={`button-edit-form-inline-${form.id}`}
                   >
