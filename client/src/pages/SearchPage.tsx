@@ -63,7 +63,7 @@ export default function SearchPage() {
   };
 
   const handleCreateSearch = () => {
-    setLocation("/search/new");
+    setLocation("/search/create");
   };
 
   return (
