@@ -57,31 +57,20 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
-      <Route>
-        <SidebarProvider>
-          <div className="flex min-h-screen w-full">
-            <AppSidebar />
-            <main className="flex-1 overflow-auto">
-              <Switch>
-                <Route path="/" component={() => <ProtectedRoute component={Dashboard} />} />
-                <Route path="/attributes" component={() => <ProtectedRoute component={Attributes} />} />
-                <Route path="/forms" component={() => <ProtectedRoute component={Forms} />} />
-                <Route path="/forms/create" component={() => <ProtectedRoute component={FormCreation} />} />
-                <Route path="/workflows" component={() => <ProtectedRoute component={Workflows} />} />
-                <Route path="/workflows/create" component={() => <ProtectedRoute component={WorkflowDesigner} />} />
-                <Route path="/workflows/:id" component={() => <ProtectedRoute component={WorkflowDesigner} />} />
-                <Route path="/projects" component={() => <ProtectedRoute component={Projects} />} />
-                <Route path="/projects/:id" component={() => <ProtectedRoute component={ProjectDetail} />} />
-                <Route path="/search" component={() => <ProtectedRoute component={SearchPage} />} />
-                <Route path="/search/create" component={() => <ProtectedRoute component={SearchCreation} />} />
-                <Route path="/account" component={() => <ProtectedRoute component={Account} />} />
-                <Route path="/users" component={() => <ProtectedRoute component={UserManagement} />} />
-                <Route component={NotFound} />
-              </Switch>
-            </main>
-          </div>
-        </SidebarProvider>
-      </Route>
+      <Route path="/" component={() => <ProtectedRoute component={Dashboard} />} />
+      <Route path="/attributes" component={() => <ProtectedRoute component={Attributes} />} />
+      <Route path="/forms" component={() => <ProtectedRoute component={Forms} />} />
+      <Route path="/forms/create" component={() => <ProtectedRoute component={FormCreation} />} />
+      <Route path="/workflows" component={() => <ProtectedRoute component={Workflows} />} />
+      <Route path="/workflows/create" component={() => <ProtectedRoute component={WorkflowDesigner} />} />
+      <Route path="/workflows/:id" component={() => <ProtectedRoute component={WorkflowDesigner} />} />
+      <Route path="/projects" component={() => <ProtectedRoute component={Projects} />} />
+      <Route path="/projects/:id" component={() => <ProtectedRoute component={ProjectDetail} />} />
+      <Route path="/search" component={() => <ProtectedRoute component={SearchPage} />} />
+      <Route path="/search/create" component={() => <ProtectedRoute component={SearchCreation} />} />
+      <Route path="/account" component={() => <ProtectedRoute component={Account} />} />
+      <Route path="/users" component={() => <ProtectedRoute component={UserManagement} />} />
+      <Route component={NotFound} />
     </Switch>
   );
 }
