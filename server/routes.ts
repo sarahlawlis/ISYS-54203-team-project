@@ -894,6 +894,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 return String(fieldValue || '').toLowerCase().includes(filterValue.toLowerCase());
 
               case 'equals':
+              case 'is': // 'is' operator works the same as 'equals'
                 if (!filterValue) return true;
                 return String(fieldValue || '').toLowerCase() === filterValue.toLowerCase();
 
@@ -920,6 +921,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 return fieldValue && String(fieldValue).trim() !== '';
 
               default:
+                console.log(`Unknown operator: ${filter.operator}, defaulting to true`);
                 return true;
             }
           });
@@ -928,15 +930,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Matched ${matchingProjects.length} projects after filtering`);
 
         // Build metadata from visible fields in the filters
-        results.push(...matchingProjects.map(p => {
+        const resultsWithMetadata = await Promise.all(matchingProjects.map(async (p) => {
           const metadata: Record<string, any> = {};
 
           // Add all visible fields to metadata
-          filters.projectFilters.forEach((filter: any) => {
+          for (const filter of filters.projectFilters) {
             if (filter.visible && filter.field) {
-              metadata[filter.field] = (p as any)[filter.field];
+              let fieldValue: any;
+
+              // Map 'created_by' to owner information
+              if (filter.field === 'created_by') {
+                // Get the owner user to show their username
+                const owner = await storage.getUser(p.ownerId);
+                fieldValue = owner?.username || p.ownerId;
+              } else {
+                fieldValue = (p as any)[filter.field];
+              }
+
+              metadata[filter.field] = fieldValue;
+              console.log(`Adding field ${filter.field} with value:`, fieldValue);
             }
-          });
+          }
+
+          console.log('Built metadata:', metadata);
 
           return {
             type: 'project',
@@ -946,6 +962,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             metadata
           };
         }));
+
+        results.push(...resultsWithMetadata);
       }
 
       // Note: Task and file filtering would be added here when those entities exist
