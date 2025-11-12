@@ -874,37 +874,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Parse the filters
       const filters = JSON.parse(search.filters);
+      console.log('Executing search with filters:', JSON.stringify(filters, null, 2));
       const results: any[] = [];
 
       // Get all projects and filter them
       if (filters.projectFilters && filters.projectFilters.length > 0) {
         const projects = await storage.getProjects();
+        console.log(`Found ${projects.length} total projects`);
         const matchingProjects = projects.filter(project => {
           return filters.projectFilters.every((filter: any) => {
-            // For now, we'll do basic matching - this can be expanded
-            if (filter.operator === 'contains' && filter.field === 'name') {
-              return project.name.toLowerCase().includes(filter.value.toLowerCase());
+            const fieldValue = (project as any)[filter.field];
+            const filterValue = filter.value?.trim() || '';
+
+            // Handle different operators
+            switch (filter.operator) {
+              case 'contains':
+                // If filter value is empty, match all (return all projects)
+                if (!filterValue) return true;
+                return String(fieldValue || '').toLowerCase().includes(filterValue.toLowerCase());
+
+              case 'equals':
+                if (!filterValue) return true;
+                return String(fieldValue || '').toLowerCase() === filterValue.toLowerCase();
+
+              case 'not_equals':
+                if (!filterValue) return true;
+                return String(fieldValue || '').toLowerCase() !== filterValue.toLowerCase();
+
+              case 'not_contains':
+                if (!filterValue) return true;
+                return !String(fieldValue || '').toLowerCase().includes(filterValue.toLowerCase());
+
+              case 'starts_with':
+                if (!filterValue) return true;
+                return String(fieldValue || '').toLowerCase().startsWith(filterValue.toLowerCase());
+
+              case 'ends_with':
+                if (!filterValue) return true;
+                return String(fieldValue || '').toLowerCase().endsWith(filterValue.toLowerCase());
+
+              case 'is_empty':
+                return !fieldValue || String(fieldValue).trim() === '';
+
+              case 'is_not_empty':
+                return fieldValue && String(fieldValue).trim() !== '';
+
+              default:
+                return true;
             }
-            return true;
           });
         });
 
-        results.push(...matchingProjects.map(p => ({
-          type: 'project',
-          id: p.id,
-          name: p.name,
-          description: p.description,
-          metadata: {
-            status: p.status,
-            createdAt: p.createdAt,
-            dueDate: p.dueDate,
-          }
-        })));
+        console.log(`Matched ${matchingProjects.length} projects after filtering`);
+
+        // Build metadata from visible fields in the filters
+        results.push(...matchingProjects.map(p => {
+          const metadata: Record<string, any> = {};
+
+          // Add all visible fields to metadata
+          filters.projectFilters.forEach((filter: any) => {
+            if (filter.visible && filter.field) {
+              metadata[filter.field] = (p as any)[filter.field];
+            }
+          });
+
+          return {
+            type: 'project',
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            metadata
+          };
+        }));
       }
 
       // Note: Task and file filtering would be added here when those entities exist
       // For now, we'll just return project results
 
+      console.log(`Returning ${results.length} total results`);
       res.json(results);
     } catch (error) {
       console.error('Error executing search:', error);
