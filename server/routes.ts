@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertAttributeSchema, insertFormSchema, insertWorkflowSchema, insertProjectSchema, insertProjectFormSchema, insertProjectWorkflowSchema, insertFormSubmissionSchema, insertUserSchema, loginUserSchema } from "@shared/schema";
+import { insertAttributeSchema, insertFormSchema, insertWorkflowSchema, insertProjectSchema, insertProjectFormSchema, insertProjectWorkflowSchema, insertFormSubmissionSchema, insertUserSchema, loginUserSchema, insertSavedSearchSchema } from "@shared/schema";
 import { hashPassword, verifyPassword, sanitizeUser, isAdmin } from "./auth";
 import { requirePermission, requireRole, canModifyProject } from "./permissions";
 import "./types";
@@ -776,6 +776,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to remove user from project" });
+    }
+  });
+
+  // Saved Searches routes
+  app.get("/api/saved-searches", requireAuth, async (req, res) => {
+    try {
+      const userId = req.query.userId as string | undefined;
+      const searches = await storage.getSavedSearches(userId);
+      res.json(searches);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch saved searches" });
+    }
+  });
+
+  app.get("/api/saved-searches/:id", requireAuth, async (req, res) => {
+    try {
+      const search = await storage.getSavedSearchById(req.params.id);
+      if (!search) {
+        return res.status(404).json({ error: "Saved search not found" });
+      }
+      res.json(search);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch saved search" });
+    }
+  });
+
+  app.post("/api/saved-searches", requireAuth, async (req, res) => {
+    try {
+      console.log('POST /api/saved-searches - Request body:', req.body);
+      console.log('POST /api/saved-searches - Session userId:', req.session.userId);
+
+      const validatedData = insertSavedSearchSchema.parse({
+        ...req.body,
+        createdBy: req.session.userId,
+      });
+
+      console.log('POST /api/saved-searches - Validated data:', validatedData);
+
+      const search = await storage.createSavedSearch(validatedData);
+
+      console.log('POST /api/saved-searches - Created search:', search);
+
+      res.status(201).json(search);
+    } catch (error) {
+      console.error('POST /api/saved-searches - Error:', error);
+      res.status(400).json({ error: "Invalid saved search data" });
+    }
+  });
+
+  app.put("/api/saved-searches/:id", requireAuth, async (req, res) => {
+    try {
+      const search = await storage.getSavedSearchById(req.params.id);
+      if (!search) {
+        return res.status(404).json({ error: "Saved search not found" });
+      }
+
+      // Only the creator can update their search
+      if (search.createdBy !== req.session.userId && !isAdmin(req.user)) {
+        return res.status(403).json({ error: "You can only update your own searches" });
+      }
+
+      const validatedData = insertSavedSearchSchema.partial().parse(req.body);
+      const updatedSearch = await storage.updateSavedSearch(req.params.id, validatedData);
+      res.json(updatedSearch);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid saved search data" });
+    }
+  });
+
+  app.delete("/api/saved-searches/:id", requireAuth, async (req, res) => {
+    try {
+      const search = await storage.getSavedSearchById(req.params.id);
+      if (!search) {
+        return res.status(404).json({ error: "Saved search not found" });
+      }
+
+      // Only the creator or admin can delete
+      if (search.createdBy !== req.session.userId && !isAdmin(req.user)) {
+        return res.status(403).json({ error: "You can only delete your own searches" });
+      }
+
+      await storage.deleteSavedSearch(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete saved search" });
+    }
+  });
+
+  // Execute a saved search and return results
+  app.get("/api/search/execute/:id", requireAuth, async (req, res) => {
+    try {
+      const search = await storage.getSavedSearchById(req.params.id);
+      if (!search) {
+        return res.status(404).json({ error: "Saved search not found" });
+      }
+
+      // Parse the filters
+      const filters = JSON.parse(search.filters);
+      const results: any[] = [];
+
+      // Get all projects and filter them
+      if (filters.projectFilters && filters.projectFilters.length > 0) {
+        const projects = await storage.getProjects();
+        const matchingProjects = projects.filter(project => {
+          return filters.projectFilters.every((filter: any) => {
+            // For now, we'll do basic matching - this can be expanded
+            if (filter.operator === 'contains' && filter.field === 'name') {
+              return project.name.toLowerCase().includes(filter.value.toLowerCase());
+            }
+            return true;
+          });
+        });
+
+        results.push(...matchingProjects.map(p => ({
+          type: 'project',
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          metadata: {
+            status: p.status,
+            createdAt: p.createdAt,
+            dueDate: p.dueDate,
+          }
+        })));
+      }
+
+      // Note: Task and file filtering would be added here when those entities exist
+      // For now, we'll just return project results
+
+      res.json(results);
+    } catch (error) {
+      console.error('Error executing search:', error);
+      res.status(500).json({ error: "Failed to execute search" });
     }
   });
 

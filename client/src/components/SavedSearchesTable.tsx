@@ -15,12 +15,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useLocation } from "wouter";
 
 interface SavedSearchesTableProps {
   searches: SavedSearchCardProps[];
 }
 
 export function SavedSearchesTable({ searches }: SavedSearchesTableProps) {
+  const [, setLocation] = useLocation();
   return (
     <div className="border rounded-card overflow-hidden">
       <Table>
@@ -44,7 +46,12 @@ export function SavedSearchesTable({ searches }: SavedSearchesTableProps) {
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-1">
-                  <Button size="sm" variant="outline" data-testid={`button-run-search-${search.id}`}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    data-testid={`button-run-search-${search.id}`}
+                    onClick={() => setLocation(`/search/results/${search.id}`)}
+                  >
                     <Play className="h-3 w-3" />
                   </Button>
                   <DropdownMenu>
@@ -54,7 +61,10 @@ export function SavedSearchesTable({ searches }: SavedSearchesTableProps) {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem data-testid={`button-edit-search-${search.id}`}>
+                      <DropdownMenuItem
+                        data-testid={`button-edit-search-${search.id}`}
+                        onClick={() => setLocation(`/search/edit/${search.id}`)}
+                      >
                         Edit
                       </DropdownMenuItem>
                       <DropdownMenuItem className="text-destructive" data-testid={`button-delete-search-${search.id}`}>

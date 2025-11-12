@@ -1,9 +1,9 @@
-import { type User, type InsertUser, type Attribute, type InsertAttribute, type Workflow, type InsertWorkflow, type Project, type InsertProject, type ProjectForm, type InsertProjectForm, type ProjectWorkflow, type InsertProjectWorkflow, type FormSubmission, type InsertFormSubmission, type AuditLog, type InsertAuditLog } from "@shared/schema";
+import { type User, type InsertUser, type Attribute, type InsertAttribute, type Workflow, type InsertWorkflow, type Project, type InsertProject, type ProjectForm, type InsertProjectForm, type ProjectWorkflow, type InsertProjectWorkflow, type FormSubmission, type InsertFormSubmission, type AuditLog, type InsertAuditLog, type SavedSearch, type InsertSavedSearch } from "@shared/schema";
 import * as schema from "@shared/schema";
 import { eq, sql as drizzleSql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { attributes, workflows, projects, projectForms, projectWorkflows, formSubmissions, auditLogs } from "@shared/schema";
+import { attributes, workflows, projects, projectForms, projectWorkflows, formSubmissions, auditLogs, savedSearches } from "@shared/schema";
 
 // modify the interface with any CRUD methods
 // you might need
@@ -56,6 +56,12 @@ export interface IStorage {
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
   getAuditLogs(limit?: number): Promise<AuditLog[]>;
   countAdmins(): Promise<number>;
+
+  getSavedSearches(userId?: string): Promise<SavedSearch[]>;
+  getSavedSearchById(id: string): Promise<SavedSearch | undefined>;
+  createSavedSearch(search: InsertSavedSearch): Promise<SavedSearch>;
+  updateSavedSearch(id: string, search: Partial<InsertSavedSearch>): Promise<SavedSearch>;
+  deleteSavedSearch(id: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -278,6 +284,38 @@ export class MemStorage implements IStorage {
       .from(schema.users)
       .where(drizzleSql`${schema.users.role} = 'admin' AND ${schema.users.isActive} = 'true'`);
     return Number(result[0]?.count || 0);
+  }
+
+  async getSavedSearches(userId?: string): Promise<SavedSearch[]> {
+    if (userId) {
+      return await db.select().from(savedSearches).where(eq(savedSearches.createdBy, userId));
+    }
+    return await db.select().from(savedSearches);
+  }
+
+  async getSavedSearchById(id: string): Promise<SavedSearch | undefined> {
+    const [search] = await db.select().from(savedSearches).where(eq(savedSearches.id, id));
+    return search;
+  }
+
+  async createSavedSearch(search: InsertSavedSearch): Promise<SavedSearch> {
+    const [newSearch] = await db.insert(savedSearches).values(search).returning();
+    return newSearch;
+  }
+
+  async updateSavedSearch(id: string, search: Partial<InsertSavedSearch>): Promise<SavedSearch> {
+    const [updatedSearch] = await db.update(savedSearches)
+      .set({
+        ...search,
+        updatedAt: drizzleSql`CURRENT_TIMESTAMP`,
+      })
+      .where(eq(savedSearches.id, id))
+      .returning();
+    return updatedSearch;
+  }
+
+  async deleteSavedSearch(id: string): Promise<void> {
+    await db.delete(savedSearches).where(eq(savedSearches.id, id));
   }
 }
 
