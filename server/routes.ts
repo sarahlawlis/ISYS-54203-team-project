@@ -782,9 +782,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Saved Searches routes
   app.get("/api/saved-searches", requireAuth, async (req, res) => {
     try {
+      const user = req.user!;
       const userId = req.query.userId as string | undefined;
-      const searches = await storage.getSavedSearches(userId);
-      res.json(searches);
+      const allSearches = await storage.getSavedSearches(userId);
+
+      // Filter searches based on visibility permissions
+      const filteredSearches = allSearches.filter(search => {
+        // User can always see their own searches
+        if (search.createdBy === user.id) {
+          return true;
+        }
+
+        // Admins can see all searches
+        if (user.role === 'admin') {
+          return true;
+        }
+
+        // Public searches visible to all
+        if (search.visibility === 'public') {
+          return true;
+        }
+
+        // Team searches visible to all users (not just viewers)
+        if (search.visibility === 'team' && user.role !== 'viewer') {
+          return true;
+        }
+
+        // Private and Shared searches only visible to owner (shared will be enhanced later)
+        return false;
+      });
+
+      res.json(filteredSearches);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch saved searches" });
     }
@@ -865,6 +893,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Execute a saved search and return results
+  // Helper function to resolve smart values in filter values
+  function resolveSmartValue(value: string, userId: string): string | { start: string; end: string } {
+    if (!value || !value.startsWith('@')) {
+      return value; // Not a smart value, return as-is
+    }
+
+    const now = new Date();
+
+    switch (value.toLowerCase()) {
+      // User smart values
+      case '@me':
+        return userId;
+
+      case '@my-team':
+        // TODO: Implement team lookup when team feature is available
+        // For now, just return the current user
+        return userId;
+
+      // Date smart values - return ranges for inclusive filtering
+      case '@today': {
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        return {
+          start: start.toISOString(),
+          end: end.toISOString()
+        };
+      }
+
+      case '@this-week': {
+        // Get start of week (Sunday at 00:00:00)
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay());
+        startOfWeek.setHours(0, 0, 0, 0);
+
+        // Get end of week (Saturday at 23:59:59)
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        endOfWeek.setHours(23, 59, 59, 999);
+
+        return {
+          start: startOfWeek.toISOString(),
+          end: endOfWeek.toISOString()
+        };
+      }
+
+      case '@this-month': {
+        // Get start of month (1st at 00:00:00)
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+
+        // Get end of month (last day at 23:59:59)
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+        return {
+          start: startOfMonth.toISOString(),
+          end: endOfMonth.toISOString()
+        };
+      }
+
+      case '@this-year': {
+        // Get start of year (Jan 1 at 00:00:00)
+        const startOfYear = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+
+        // Get end of year (Dec 31 at 23:59:59)
+        const endOfYear = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+
+        return {
+          start: startOfYear.toISOString(),
+          end: endOfYear.toISOString()
+        };
+      }
+
+      default:
+        console.log(`Unknown smart value: ${value}, returning as-is`);
+        return value;
+    }
+  }
+
   app.get("/api/search/execute/:id", requireAuth, async (req, res) => {
     try {
       const search = await storage.getSavedSearchById(req.params.id);
@@ -875,44 +980,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse the filters
       const filters = JSON.parse(search.filters);
       console.log('Executing search with filters:', JSON.stringify(filters, null, 2));
+
+      // Resolve smart values in all filters
+      const userId = (req.session as any).userId;
+      if (filters.projectFilters) {
+        filters.projectFilters = filters.projectFilters.map((filter: any) => {
+          // Check smartValue field first (new consolidated UI), then fall back to value field
+          const valueToResolve = filter.smartValue || filter.value;
+          return {
+            ...filter,
+            value: typeof valueToResolve === 'string' ? resolveSmartValue(valueToResolve, userId) : valueToResolve
+          };
+        });
+      }
+      if (filters.taskFilters) {
+        filters.taskFilters = filters.taskFilters.map((filter: any) => {
+          const valueToResolve = filter.smartValue || filter.value;
+          return {
+            ...filter,
+            value: typeof valueToResolve === 'string' ? resolveSmartValue(valueToResolve, userId) : valueToResolve
+          };
+        });
+      }
+      if (filters.fileFilters) {
+        filters.fileFilters = filters.fileFilters.map((filter: any) => {
+          const valueToResolve = filter.smartValue || filter.value;
+          return {
+            ...filter,
+            value: typeof valueToResolve === 'string' ? resolveSmartValue(valueToResolve, userId) : valueToResolve
+          };
+        });
+      }
+      if (filters.attributeFilters) {
+        filters.attributeFilters = filters.attributeFilters.map((filter: any) => {
+          const valueToResolve = filter.smartValue || filter.value;
+          return {
+            ...filter,
+            value: typeof valueToResolve === 'string' ? resolveSmartValue(valueToResolve, userId) : valueToResolve
+          };
+        });
+      }
+
+      console.log('Filters after smart value resolution:', JSON.stringify(filters, null, 2));
       const results: any[] = [];
 
       // Get all projects and filter them
+      // Field name mapping from UI field names to database column names
+      const fieldMapping: Record<string, string> = {
+        'created_by': 'ownerId',
+        'last_modified': 'updatedAt',
+        'started': 'createdAt',
+        'due_date': 'dueDate',
+        'team_size': 'teamSize',
+      };
+
       if (filters.projectFilters && filters.projectFilters.length > 0) {
         const projects = await storage.getProjects();
         console.log(`Found ${projects.length} total projects`);
         const matchingProjects = projects.filter(project => {
           return filters.projectFilters.every((filter: any) => {
-            const fieldValue = (project as any)[filter.field];
-            const filterValue = filter.value?.trim() || '';
+            // Map field names to actual project properties
+            const fieldName = fieldMapping[filter.field] || filter.field;
+            const fieldValue = (project as any)[fieldName];
+            const filterValue = filter.value;
 
-            // Handle different operators
+            // Check if filterValue is a date range object
+            const isDateRange = filterValue && typeof filterValue === 'object' && 'start' in filterValue && 'end' in filterValue;
+
+            // Handle date range filtering
+            if (isDateRange) {
+              const fieldDate = fieldValue ? new Date(fieldValue).getTime() : null;
+              if (!fieldDate) return false; // No date value means no match
+
+              const startDate = new Date(filterValue.start).getTime();
+              const endDate = new Date(filterValue.end).getTime();
+
+              switch (filter.operator) {
+                case 'on':
+                case 'equals':
+                case 'is':
+                  // Check if field date is within the range (inclusive)
+                  return fieldDate >= startDate && fieldDate <= endDate;
+
+                case 'before':
+                  // Before the start of the range
+                  return fieldDate < startDate;
+
+                case 'after':
+                  // After the end of the range
+                  return fieldDate > endDate;
+
+                case 'between':
+                  // Within the range (inclusive)
+                  return fieldDate >= startDate && fieldDate <= endDate;
+
+                default:
+                  return true;
+              }
+            }
+
+            // Handle regular string filtering
+            const stringValue = filterValue?.trim ? filterValue.trim() : String(filterValue || '');
+
             switch (filter.operator) {
               case 'contains':
-                // If filter value is empty, match all (return all projects)
-                if (!filterValue) return true;
-                return String(fieldValue || '').toLowerCase().includes(filterValue.toLowerCase());
+                if (!stringValue) return true;
+                return String(fieldValue || '').toLowerCase().includes(stringValue.toLowerCase());
 
               case 'equals':
-              case 'is': // 'is' operator works the same as 'equals'
-                if (!filterValue) return true;
-                return String(fieldValue || '').toLowerCase() === filterValue.toLowerCase();
+              case 'is':
+                if (!stringValue) return true;
+                return String(fieldValue || '').toLowerCase() === stringValue.toLowerCase();
 
               case 'not_equals':
-                if (!filterValue) return true;
-                return String(fieldValue || '').toLowerCase() !== filterValue.toLowerCase();
+              case 'is_not':
+                if (!stringValue) return true;
+                return String(fieldValue || '').toLowerCase() !== stringValue.toLowerCase();
 
               case 'not_contains':
-                if (!filterValue) return true;
-                return !String(fieldValue || '').toLowerCase().includes(filterValue.toLowerCase());
+                if (!stringValue) return true;
+                return !String(fieldValue || '').toLowerCase().includes(stringValue.toLowerCase());
 
               case 'starts_with':
-                if (!filterValue) return true;
-                return String(fieldValue || '').toLowerCase().startsWith(filterValue.toLowerCase());
+                if (!stringValue) return true;
+                return String(fieldValue || '').toLowerCase().startsWith(stringValue.toLowerCase());
 
               case 'ends_with':
-                if (!filterValue) return true;
-                return String(fieldValue || '').toLowerCase().endsWith(filterValue.toLowerCase());
+                if (!stringValue) return true;
+                return String(fieldValue || '').toLowerCase().endsWith(stringValue.toLowerCase());
 
               case 'is_empty':
                 return !fieldValue || String(fieldValue).trim() === '';
@@ -938,17 +1133,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (filter.visible && filter.field) {
               let fieldValue: any;
 
+              // Get the actual database field name
+              const dbFieldName = fieldMapping[filter.field] || filter.field;
+
               // Map 'created_by' to owner information
               if (filter.field === 'created_by') {
                 // Get the owner user to show their username
                 const owner = await storage.getUser(p.ownerId);
                 fieldValue = owner?.username || p.ownerId;
               } else {
-                fieldValue = (p as any)[filter.field];
+                fieldValue = (p as any)[dbFieldName];
               }
 
               metadata[filter.field] = fieldValue;
-              console.log(`Adding field ${filter.field} with value:`, fieldValue);
+              console.log(`Adding field ${filter.field} (mapped to ${dbFieldName}) with value:`, fieldValue);
             }
           }
 

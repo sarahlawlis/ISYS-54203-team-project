@@ -33,31 +33,22 @@ export default function SearchPage() {
     setLocation("/search/create");
   };
 
-  // Filter searches by search term
-  const filteredSearches = savedSearches.filter((search) =>
-    search.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter searches by search term and sort alphabetically
+  const filteredSearches = savedSearches
+    .filter((search) =>
+      search.name.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   // Transform database searches to component format
   const transformedSearches = filteredSearches.map((search) => {
-    // Parse the filters JSON to count total filters
-    let resultCount = 0;
-    try {
-      const filters = JSON.parse(search.filters);
-      resultCount =
-        (filters.projectFilters?.length || 0) +
-        (filters.taskFilters?.length || 0) +
-        (filters.fileFilters?.length || 0) +
-        (filters.attributeFilters?.length || 0);
-    } catch (e) {
-      // If parsing fails, just use 0
-    }
-
     return {
       id: search.id,
       name: search.name,
+      description: search.description,
+      visibility: search.visibility,
       filters: search.filters,
-      resultCount: resultCount,
+      resultCount: 0, // No longer displaying counts on SearchPage for performance
     };
   });
 
