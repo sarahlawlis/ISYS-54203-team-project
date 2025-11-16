@@ -182,6 +182,8 @@ export type AuditLog = typeof auditLogs.$inferSelect;
 export const savedSearches = pgTable("saved_searches", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
+  description: text("description"),
+  visibility: text("visibility").notNull(), // 'private', 'shared', 'team', 'public'
   createdBy: varchar("created_by").notNull(),
   filters: text("filters").notNull().default('{}'), // JSON string of all filters
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
