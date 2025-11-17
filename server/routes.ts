@@ -550,9 +550,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { formIds, workflowIds, ...projectData } = req.body;
+      const { userIds, formIds, workflowIds, ...projectData } = req.body;
       const validatedData = insertProjectSchema.partial().parse(projectData);
       const updatedProject = await storage.updateProject(req.params.id, validatedData);
+
+      if (userIds !== undefined) {
+        const existingUsers = await storage.getProjectUsers(req.params.id);
+        const existingUserIds = existingUsers.map(pu => pu.userId);
+
+        const usersToAdd = userIds.filter((id: string) => !existingUserIds.includes(id));
+        const usersToRemove = existingUserIds.filter(id => !userIds.includes(id));
+
+        await Promise.all([
+          ...usersToAdd.map((userId: string) => storage.addProjectUser({ projectId: req.params.id, userId })),
+          ...usersToRemove.map((userId: string) => storage.removeProjectUser(req.params.id, userId)),
+        ]);
+      }
 
       if (formIds !== undefined) {
         const existingForms = await storage.getProjectForms(req.params.id);
