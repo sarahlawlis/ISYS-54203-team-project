@@ -38,7 +38,7 @@ export function ProjectsTable({ projects }: ProjectsTableProps) {
             <TableHead>Description</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Due Date</TableHead>
-            <TableHead>Team Size</TableHead>
+            <TableHead>Assigned Users</TableHead>
             <TableHead>Workflows</TableHead>
             <TableHead className="w-[70px]"></TableHead>
           </TableRow>
@@ -53,8 +53,12 @@ export function ProjectsTable({ projects }: ProjectsTableProps) {
               <TableCell>
                 <Badge className={statusColors[project.status]}>{project.status}</Badge>
               </TableCell>
-              <TableCell className="text-muted-foreground">{project.dueDate}</TableCell>
-              <TableCell className="text-muted-foreground">{project.teamSize}</TableCell>
+              <TableCell className="text-muted-foreground">{project.dueDate || "No due date"}</TableCell>
+              <TableCell className="text-muted-foreground">
+                {project.assignedUsernames && project.assignedUsernames.length > 0
+                  ? `${project.assignedUsernames.length} ${project.assignedUsernames.length === 1 ? 'user' : 'users'}`
+                  : 'No users'}
+              </TableCell>
               <TableCell className="text-muted-foreground">{project.activeWorkflows}</TableCell>
               <TableCell>
                 <DropdownMenu>

@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
-import { insertProjectSchema, type Form as FormType, type Workflow } from "@shared/schema";
+import { insertProjectSchema, type Form as FormType, type Workflow, type User } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
@@ -51,6 +51,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Check, ChevronsUpDown, X } from "lucide-react";
 
 const createProjectFormSchema = insertProjectSchema.extend({
+  userIds: z.array(z.string()).optional(),
   formIds: z.array(z.string()).optional(),
   workflowIds: z.array(z.string()).optional(),
   startWorkflows: z.boolean().default(false),
@@ -68,8 +69,14 @@ interface CreateProjectDialogProps {
 export function CreateProjectDialog({ open, onOpenChange, projectId, initialData }: CreateProjectDialogProps) {
   const { toast } = useToast();
   const isEditMode = !!projectId;
+  const [selectedUsers, setSelectedUsers] = useState<string[]>(initialData?.userIds || []);
   const [selectedForms, setSelectedForms] = useState<string[]>(initialData?.formIds || []);
   const [selectedWorkflows, setSelectedWorkflows] = useState<string[]>(initialData?.workflowIds || []);
+
+  const { data: users = [] } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+    enabled: open,
+  });
 
   const { data: forms = [] } = useQuery<FormType[]>({
     queryKey: ["/api/forms"],
@@ -87,8 +94,8 @@ export function CreateProjectDialog({ open, onOpenChange, projectId, initialData
       name: "",
       description: "",
       status: "planning",
-      teamSize: "0",
       dueDate: "",
+      userIds: [],
       formIds: [],
       workflowIds: [],
       startWorkflows: false,
@@ -98,6 +105,7 @@ export function CreateProjectDialog({ open, onOpenChange, projectId, initialData
   useEffect(() => {
     if (open && initialData) {
       form.reset(initialData);
+      setSelectedUsers(initialData.userIds || []);
       setSelectedForms(initialData.formIds || []);
       setSelectedWorkflows(initialData.workflowIds || []);
     } else if (open && !initialData) {
@@ -105,12 +113,13 @@ export function CreateProjectDialog({ open, onOpenChange, projectId, initialData
         name: "",
         description: "",
         status: "planning",
-        teamSize: "0",
         dueDate: "",
+        userIds: [],
         formIds: [],
         workflowIds: [],
         startWorkflows: false,
       });
+      setSelectedUsers([]);
       setSelectedForms([]);
       setSelectedWorkflows([]);
     }
@@ -118,11 +127,12 @@ export function CreateProjectDialog({ open, onOpenChange, projectId, initialData
 
   const createProjectMutation = useMutation({
     mutationFn: async (data: CreateProjectFormData) => {
-      const { formIds, workflowIds, startWorkflows, ...projectData } = data;
+      const { userIds, formIds, workflowIds, startWorkflows, ...projectData } = data;
       
       if (isEditMode && projectId) {
         const projectRes = await apiRequest("PUT", `/api/projects/${projectId}`, {
           ...projectData,
+          userIds,
           formIds,
           workflowIds,
         });
@@ -130,6 +140,14 @@ export function CreateProjectDialog({ open, onOpenChange, projectId, initialData
       } else {
         const projectRes = await apiRequest("POST", "/api/projects", projectData);
         const project = await projectRes.json();
+
+        if (userIds && userIds.length > 0) {
+          await Promise.all(
+            userIds.map((userId) =>
+              apiRequest("POST", `/api/projects/${project.id}/users`, { userId })
+            )
+          );
+        }
 
         if (formIds && formIds.length > 0) {
           await Promise.all(
@@ -166,6 +184,7 @@ export function CreateProjectDialog({ open, onOpenChange, projectId, initialData
           : "Your project has been created successfully.",
       });
       form.reset();
+      setSelectedUsers([]);
       setSelectedForms([]);
       setSelectedWorkflows([]);
       onOpenChange(false);
@@ -184,9 +203,16 @@ export function CreateProjectDialog({ open, onOpenChange, projectId, initialData
   const handleSubmit = (data: CreateProjectFormData) => {
     createProjectMutation.mutate({
       ...data,
+      userIds: selectedUsers,
       formIds: selectedForms,
       workflowIds: selectedWorkflows,
     });
+  };
+
+  const toggleUser = (userId: string) => {
+    setSelectedUsers((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
   };
 
   const toggleForm = (formId: string) => {
@@ -279,17 +305,16 @@ export function CreateProjectDialog({ open, onOpenChange, projectId, initialData
 
               <FormField
                 control={form.control}
-                name="teamSize"
+                name="dueDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Team Size</FormLabel>
+                    <FormLabel>Due Date</FormLabel>
                     <FormControl>
                       <Input
-                        type="number"
-                        min="0"
-                        placeholder="0"
+                        type="date"
                         {...field}
-                        data-testid="input-team-size"
+                        value={field.value || ""}
+                        data-testid="input-due-date"
                       />
                     </FormControl>
                     <FormMessage />
@@ -298,24 +323,81 @@ export function CreateProjectDialog({ open, onOpenChange, projectId, initialData
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="dueDate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Due Date</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="date"
-                      {...field}
-                      value={field.value || ""}
-                      data-testid="input-due-date"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+            <div className="space-y-3">
+              <FormLabel>Assign Users</FormLabel>
+              <FormDescription>
+                Select users to assign to this project
+              </FormDescription>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-between"
+                    data-testid="button-select-users"
+                  >
+                    <span className="truncate">
+                      {selectedUsers.length === 0
+                        ? "Select users..."
+                        : `${selectedUsers.length} user${selectedUsers.length !== 1 ? 's' : ''} selected`}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search users..." />
+                    <CommandList>
+                      <CommandEmpty>No users found.</CommandEmpty>
+                      <CommandGroup>
+                        {users.map((user) => (
+                          <CommandItem
+                            key={user.id}
+                            onSelect={() => toggleUser(user.id)}
+                            data-testid={`commanditem-user-${user.id}`}
+                          >
+                            <div className="flex items-center gap-2 flex-1">
+                              <Checkbox
+                                checked={selectedUsers.includes(user.id)}
+                                onCheckedChange={() => toggleUser(user.id)}
+                                data-testid={`checkbox-user-${user.id}`}
+                              />
+                              <div className="flex flex-col">
+                                <span className="font-medium">{user.username}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {user.role}
+                                </span>
+                              </div>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {selectedUsers.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {selectedUsers.map((userId) => {
+                    const user = users.find(u => u.id === userId);
+                    return user ? (
+                      <Badge
+                        key={userId}
+                        variant="secondary"
+                        className="gap-1"
+                        data-testid={`badge-user-${userId}`}
+                      >
+                        {user.username}
+                        <X
+                          className="h-3 w-3 cursor-pointer"
+                          onClick={() => toggleUser(userId)}
+                          data-testid={`button-remove-user-${userId}`}
+                        />
+                      </Badge>
+                    ) : null;
+                  })}
+                </div>
               )}
-            />
+            </div>
 
             <div className="space-y-3">
               <FormLabel>Assign Forms</FormLabel>

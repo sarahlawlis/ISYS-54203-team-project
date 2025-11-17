@@ -8,6 +8,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Link } from "wouter";
 
 export interface ProjectCardProps {
@@ -16,7 +22,7 @@ export interface ProjectCardProps {
   description: string;
   status: "active" | "planning" | "completed" | "on-hold";
   dueDate: string;
-  teamSize: number;
+  assignedUsernames?: string[];
   activeWorkflows: number;
 }
 
@@ -33,13 +39,17 @@ export function ProjectCard({
   description,
   status,
   dueDate,
-  teamSize,
+  assignedUsernames = [],
   activeWorkflows,
 }: ProjectCardProps) {
   const handleMenuClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
   };
+
+  const userCount = assignedUsernames.length;
+  const displayUsernames = assignedUsernames.slice(0, 2).join(", ");
+  const remainingCount = userCount > 2 ? userCount - 2 : 0;
 
   return (
     <Link href={`/projects/${id}`}>
@@ -88,12 +98,33 @@ export function ProjectCard({
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1">
               <Calendar className="h-4 w-4" />
-              <span>{dueDate}</span>
+              <span>{dueDate || "No due date"}</span>
             </div>
-            <div className="flex items-center gap-1">
-              <Users className="h-4 w-4" />
-              <span>{teamSize}</span>
-            </div>
+            {userCount > 0 ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1" data-testid={`text-assigned-users-${id}`}>
+                      <Users className="h-4 w-4" />
+                      <span>
+                        {userCount} {userCount === 1 ? 'user' : 'users'}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="text-sm">
+                      {displayUsernames}
+                      {remainingCount > 0 && ` +${remainingCount} more`}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <div className="flex items-center gap-1 text-muted-foreground/50" data-testid={`text-assigned-users-${id}`}>
+                <Users className="h-4 w-4" />
+                <span>No users</span>
+              </div>
+            )}
           </div>
           <Button variant="outline" size="sm" data-testid={`button-view-project-${id}`}>
             View

@@ -12,9 +12,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus, Search, Loader2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { Project } from "@shared/schema";
+import type { Project, User } from "@shared/schema";
+
+type ProjectWithUsers = Project & {
+  assignedUsernames: string[];
+};
 
 export default function Projects() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -22,9 +26,40 @@ export default function Projects() {
   const [view, setView] = useState<ViewMode>("cards");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
-  const { data: projects = [], isLoading } = useQuery<Project[]>({
+  const { data: projects = [], isLoading: isLoadingProjects } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
   });
+
+  const { data: projectUsersMap = {}, isLoading: isLoadingUsers } = useQuery<Record<string, string[]>>({
+    queryKey: ["/api/projects/users-map"],
+    queryFn: async () => {
+      const map: Record<string, string[]> = {};
+      
+      await Promise.all(
+        projects.map(async (project) => {
+          const response = await fetch(`/api/projects/${project.id}/users`);
+          if (response.ok) {
+            const data = await response.json();
+            map[project.id] = data.users?.map((u: User) => u.username) || [];
+          } else {
+            map[project.id] = [];
+          }
+        })
+      );
+      
+      return map;
+    },
+    enabled: projects.length > 0,
+  });
+
+  const isLoading = isLoadingProjects || isLoadingUsers;
+
+  const projectsWithUsers = useMemo<ProjectWithUsers[]>(() => {
+    return projects.map(project => ({
+      ...project,
+      assignedUsernames: projectUsersMap[project.id] || [],
+    }));
+  }, [projects, projectUsersMap]);
 
   useEffect(() => {
     const stored = localStorage.getItem("projects-view") as ViewMode | null;
@@ -36,7 +71,7 @@ export default function Projects() {
     localStorage.setItem("projects-view", newView);
   };
 
-  const filteredProjects = projects.filter((project) => {
+  const filteredProjects = projectsWithUsers.filter((project) => {
     const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || project.status === statusFilter;
@@ -113,7 +148,7 @@ export default function Projects() {
                   description={project.description || ""}
                   status={project.status as "active" | "planning" | "on-hold" | "completed"}
                   dueDate={project.dueDate || ""}
-                  teamSize={parseInt(project.teamSize) || 0}
+                  assignedUsernames={project.assignedUsernames}
                   activeWorkflows={0}
                 />
               ))}
@@ -126,7 +161,7 @@ export default function Projects() {
                 description: project.description || "",
                 status: project.status as "active" | "planning" | "on-hold" | "completed",
                 dueDate: project.dueDate || "",
-                teamSize: parseInt(project.teamSize) || 0,
+                assignedUsernames: project.assignedUsernames,
                 activeWorkflows: 0,
               }))}
             />

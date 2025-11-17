@@ -1,9 +1,9 @@
-import { type User, type InsertUser, type Attribute, type InsertAttribute, type Workflow, type InsertWorkflow, type Project, type InsertProject, type ProjectForm, type InsertProjectForm, type ProjectWorkflow, type InsertProjectWorkflow, type FormSubmission, type InsertFormSubmission, type AuditLog, type InsertAuditLog, type SavedSearch, type InsertSavedSearch } from "@shared/schema";
+import { type User, type InsertUser, type Attribute, type InsertAttribute, type Workflow, type InsertWorkflow, type Project, type InsertProject, type ProjectUser, type InsertProjectUser, type ProjectForm, type InsertProjectForm, type ProjectWorkflow, type InsertProjectWorkflow, type FormSubmission, type InsertFormSubmission, type AuditLog, type InsertAuditLog, type SavedSearch, type InsertSavedSearch } from "@shared/schema";
 import * as schema from "@shared/schema";
-import { eq, sql as drizzleSql } from "drizzle-orm";
+import { eq, sql as drizzleSql, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { attributes, workflows, projects, projectForms, projectWorkflows, formSubmissions, auditLogs, savedSearches } from "@shared/schema";
+import { attributes, workflows, projects, projectUsers, projectForms, projectWorkflows, formSubmissions, auditLogs, savedSearches } from "@shared/schema";
 
 // modify the interface with any CRUD methods
 // you might need
@@ -41,8 +41,13 @@ export interface IStorage {
   updateProject(id: string, project: Partial<InsertProject>): Promise<Project>;
   deleteProject(id: string): Promise<void>;
 
+  getProjectUsers(projectId: string): Promise<ProjectUser[]>;
+  addProjectUser(projectUser: InsertProjectUser): Promise<ProjectUser>;
+  removeProjectUser(projectId: string, userId: string): Promise<void>;
+
   getProjectForms(projectId: string): Promise<ProjectForm[]>;
   addProjectForm(projectForm: InsertProjectForm): Promise<ProjectForm>;
+  updateProjectForm(id: string, projectForm: Partial<InsertProjectForm>): Promise<ProjectForm>;
   removeProjectForm(projectId: string, formId: string): Promise<void>;
 
   getProjectWorkflows(projectId: string): Promise<ProjectWorkflow[]>;
@@ -217,10 +222,25 @@ export class MemStorage implements IStorage {
   }
 
   async deleteProject(id: string): Promise<void> {
+    await db.delete(projectUsers).where(eq(projectUsers.projectId, id));
     await db.delete(projectForms).where(eq(projectForms.projectId, id));
     await db.delete(projectWorkflows).where(eq(projectWorkflows.projectId, id));
     await db.delete(formSubmissions).where(eq(formSubmissions.projectId, id));
     await db.delete(projects).where(eq(projects.id, id));
+  }
+
+  async getProjectUsers(projectId: string): Promise<ProjectUser[]> {
+    return await db.select().from(projectUsers).where(eq(projectUsers.projectId, projectId));
+  }
+
+  async addProjectUser(projectUser: InsertProjectUser): Promise<ProjectUser> {
+    const [newProjectUser] = await db.insert(projectUsers).values(projectUser).returning();
+    return newProjectUser;
+  }
+
+  async removeProjectUser(projectId: string, userId: string): Promise<void> {
+    await db.delete(projectUsers)
+      .where(and(eq(projectUsers.projectId, projectId), eq(projectUsers.userId, userId)));
   }
 
   async getProjectForms(projectId: string): Promise<ProjectForm[]> {
@@ -232,9 +252,17 @@ export class MemStorage implements IStorage {
     return newProjectForm;
   }
 
+  async updateProjectForm(id: string, projectForm: Partial<InsertProjectForm>): Promise<ProjectForm> {
+    const [updatedProjectForm] = await db.update(projectForms)
+      .set(projectForm)
+      .where(eq(projectForms.id, id))
+      .returning();
+    return updatedProjectForm;
+  }
+
   async removeProjectForm(projectId: string, formId: string): Promise<void> {
     await db.delete(projectForms)
-      .where(drizzleSql`${projectForms.projectId} = ${projectId} AND ${projectForms.formId} = ${formId}`);
+      .where(and(eq(projectForms.projectId, projectId), eq(projectForms.formId, formId)));
   }
 
   async getProjectWorkflows(projectId: string): Promise<ProjectWorkflow[]> {
