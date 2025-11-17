@@ -13,6 +13,7 @@ import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
 import SearchPage from "./pages/SearchPage";
 import SearchCreation from "./pages/SearchCreation";
+import SearchResults from "./pages/SearchResults";
 import Login from "./pages/Login";
 import Account from "./pages/Account";
 import UserManagement from "./pages/UserManagement";
@@ -68,6 +69,8 @@ function Router() {
       <Route path="/projects/:id" component={() => <ProtectedRoute component={ProjectDetail} />} />
       <Route path="/search" component={() => <ProtectedRoute component={SearchPage} />} />
       <Route path="/search/create" component={() => <ProtectedRoute component={SearchCreation} />} />
+      <Route path="/search/edit/:id" component={() => <ProtectedRoute component={SearchCreation} />} />
+      <Route path="/search/results/:id" component={() => <ProtectedRoute component={SearchResults} />} />
       <Route path="/account" component={() => <ProtectedRoute component={Account} />} />
       <Route path="/users" component={() => <ProtectedRoute component={UserManagement} />} />
       <Route component={NotFound} />
@@ -92,7 +95,7 @@ export default function App() {
                 <SidebarTrigger data-testid="button-sidebar-toggle" />
                 <ThemeToggle />
               </header>
-              <main className="flex-1 overflow-hidden">
+              <main className="flex-1 overflow-auto">
                 <Router />
               </main>
             </div>

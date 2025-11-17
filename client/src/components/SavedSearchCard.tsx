@@ -7,6 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useLocation } from "wouter";
 
 export interface SavedSearchCardProps {
   id: string;
@@ -21,6 +22,7 @@ export function SavedSearchCard({
   filters,
   resultCount,
 }: SavedSearchCardProps) {
+  const [, setLocation] = useLocation();
   return (
     <Card className="rounded-card hover-elevate" data-testid={`card-saved-search-${id}`}>
       <CardContent className="p-4">
@@ -42,7 +44,12 @@ export function SavedSearchCard({
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <Button size="sm" variant="outline" data-testid={`button-run-search-${id}`}>
+            <Button
+              size="sm"
+              variant="outline"
+              data-testid={`button-run-search-${id}`}
+              onClick={() => setLocation(`/search/results/${id}`)}
+            >
               <Play className="h-3 w-3" />
             </Button>
             <DropdownMenu>
@@ -52,7 +59,10 @@ export function SavedSearchCard({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem data-testid={`button-edit-search-${id}`}>
+                <DropdownMenuItem
+                  data-testid={`button-edit-search-${id}`}
+                  onClick={() => setLocation(`/search/edit/${id}`)}
+                >
                   Edit
                 </DropdownMenuItem>
                 <DropdownMenuItem className="text-destructive" data-testid={`button-delete-search-${id}`}>
