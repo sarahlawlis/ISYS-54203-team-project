@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -85,8 +86,9 @@ const operatorsByType = {
     { value: 'is', label: 'is' },
     { value: 'is_not', label: 'is not' },
     { value: 'is_me', label: 'is me' },
+    { value: 'is_not_me', label: 'is not me' },
     { value: 'is_my_team', label: 'is my team' },
-    { value: 'not_my_team', label: 'not my team' },
+    { value: 'is_not_my_team', label: 'is not my team' },
     { value: 'is_empty', label: 'is empty' },
     { value: 'is_not_empty', label: 'is not empty' },
   ],
@@ -111,6 +113,8 @@ export default function SearchCreation() {
   const isEditMode = !!searchId;
 
   const [searchName, setSearchName] = useState("");
+  const [searchDescription, setSearchDescription] = useState("");
+  const [searchVisibility, setSearchVisibility] = useState("");
   const [isAttributeDialogOpen, setIsAttributeDialogOpen] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -138,23 +142,43 @@ export default function SearchCreation() {
   // Attribute filters state
   const [attributeFilters, setAttributeFilters] = useState<FilterRow[]>([]);
 
+  // Helper to convert backend operators with smart values to display operators
+  const convertOperatorForDisplay = (filter: FilterRow): FilterRow => {
+    if (filter.smartValue === '@me') {
+      if (filter.operator === 'is') {
+        return { ...filter, operator: 'is_me' };
+      } else if (filter.operator === 'is_not') {
+        return { ...filter, operator: 'is_not_me' };
+      }
+    } else if (filter.smartValue === '@my-team') {
+      if (filter.operator === 'is') {
+        return { ...filter, operator: 'is_my_team' };
+      } else if (filter.operator === 'is_not') {
+        return { ...filter, operator: 'is_not_my_team' };
+      }
+    }
+    return filter;
+  };
+
   // Load existing search data when in edit mode
   useEffect(() => {
     if (existingSearch) {
       setSearchName(existingSearch.name);
+      setSearchDescription(existingSearch.description || "");
+      setSearchVisibility(existingSearch.visibility || "");
       try {
         const parsedFilters = JSON.parse(existingSearch.filters);
         if (parsedFilters.projectFilters) {
-          setProjectFilters(parsedFilters.projectFilters);
+          setProjectFilters(parsedFilters.projectFilters.map(convertOperatorForDisplay));
         }
         if (parsedFilters.taskFilters) {
-          setTaskFilters(parsedFilters.taskFilters);
+          setTaskFilters(parsedFilters.taskFilters.map(convertOperatorForDisplay));
         }
         if (parsedFilters.fileFilters) {
-          setFileFilters(parsedFilters.fileFilters);
+          setFileFilters(parsedFilters.fileFilters.map(convertOperatorForDisplay));
         }
         if (parsedFilters.attributeFilters) {
-          setAttributeFilters(parsedFilters.attributeFilters);
+          setAttributeFilters(parsedFilters.attributeFilters.map(convertOperatorForDisplay));
         }
       } catch (error) {
         console.error("Error parsing existing filters:", error);
@@ -283,6 +307,20 @@ export default function SearchCreation() {
     setAttributeFilters(attributeFilters.map(f => f.id === id ? { ...f, ...updates } : f));
   };
 
+  const convertOperatorForBackend = (filter: FilterRow): FilterRow => {
+    // Convert display operators to backend operators
+    if (filter.operator === 'is_me') {
+      return { ...filter, operator: 'is' };
+    } else if (filter.operator === 'is_not_me') {
+      return { ...filter, operator: 'is_not' };
+    } else if (filter.operator === 'is_my_team') {
+      return { ...filter, operator: 'is' };
+    } else if (filter.operator === 'is_not_my_team') {
+      return { ...filter, operator: 'is_not' };
+    }
+    return filter;
+  };
+
   const handleSaveReport = async () => {
     if (!searchName.trim()) {
       toast({
@@ -293,12 +331,21 @@ export default function SearchCreation() {
       return;
     }
 
+    if (!searchVisibility) {
+      toast({
+        title: "Error",
+        description: "Please select a visibility option",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const filters = {
-        projectFilters,
-        taskFilters,
-        fileFilters,
-        attributeFilters,
+        projectFilters: projectFilters.map(convertOperatorForBackend),
+        taskFilters: taskFilters.map(convertOperatorForBackend),
+        fileFilters: fileFilters.map(convertOperatorForBackend),
+        attributeFilters: attributeFilters.map(convertOperatorForBackend),
       };
 
       const url = isEditMode ? `/api/saved-searches/${searchId}` : "/api/saved-searches";
@@ -311,6 +358,8 @@ export default function SearchCreation() {
         },
         body: JSON.stringify({
           name: searchName,
+          description: searchDescription,
+          visibility: searchVisibility,
           filters: JSON.stringify(filters),
         }),
       });
@@ -319,8 +368,12 @@ export default function SearchCreation() {
         throw new Error(`Failed to ${isEditMode ? 'update' : 'save'} search`);
       }
 
-      // Invalidate saved searches cache
+      // Invalidate saved searches cache and search execution cache
       queryClient.invalidateQueries({ queryKey: ["/api/saved-searches"] });
+      if (isEditMode && searchId) {
+        // Also invalidate the search execution results for this specific search
+        queryClient.invalidateQueries({ queryKey: ["/api/search/execute", searchId] });
+      }
 
       toast({
         title: "Success",
@@ -348,13 +401,13 @@ export default function SearchCreation() {
   };
 
   const needsValueInput = (operator: string): boolean => {
-    return !['is_empty', 'is_not_empty', 'is_me', 'is_my_team', 'not_my_team'].includes(operator);
+    return !['is_empty', 'is_not_empty', 'is_me', 'is_not_me', 'is_my_team', 'is_not_my_team'].includes(operator);
   };
 
   const canUseSmartValues = (fieldType: FieldType, operator: string): boolean => {
-    if (!needsValueInput(operator)) return false;
-    return (fieldType === 'user' && ['is', 'is_not'].includes(operator)) ||
-           (fieldType === 'date' && ['before', 'after', 'on'].includes(operator));
+    // Smart values are now consolidated into operator options (is me, is not me, etc.)
+    // No need for separate smart value dropdown
+    return false;
   };
 
   const renderFilterRow = (
@@ -414,7 +467,28 @@ export default function SearchCreation() {
         <div className="col-span-2">
           <Select
             value={filter.operator}
-            onValueChange={(value) => onUpdate(filter.id, { operator: value, smartValue: undefined })}
+            onValueChange={(value) => {
+              // Automatically set smart values for the new consolidated operators
+              const updates: Partial<FilterRow> = { operator: value };
+
+              if (value === 'is_me') {
+                updates.smartValue = '@me';
+                updates.value = '';
+              } else if (value === 'is_not_me') {
+                updates.smartValue = '@me';
+                updates.value = '';
+              } else if (value === 'is_my_team') {
+                updates.smartValue = '@my-team';
+                updates.value = '';
+              } else if (value === 'is_not_my_team') {
+                updates.smartValue = '@my-team';
+                updates.value = '';
+              } else {
+                updates.smartValue = undefined;
+              }
+
+              onUpdate(filter.id, updates);
+            }}
           >
             <SelectTrigger data-testid={`select-operator-${filter.id}`}>
               <SelectValue />
@@ -535,13 +609,48 @@ export default function SearchCreation() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="search-name">Search Name</Label>
+          <Label htmlFor="search-name">
+            Search Name <span className="text-destructive">*</span>
+          </Label>
           <Input
             id="search-name"
             placeholder="Enter search name..."
             value={searchName}
             onChange={(e) => setSearchName(e.target.value)}
             data-testid="input-search-name"
+            required
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="search-visibility">
+            Visibility <span className="text-destructive">*</span>
+          </Label>
+          <Select
+            value={searchVisibility}
+            onValueChange={setSearchVisibility}
+          >
+            <SelectTrigger id="search-visibility" data-testid="select-search-visibility">
+              <SelectValue placeholder="Select visibility..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="private">Private - Only you can view</SelectItem>
+              <SelectItem value="shared">Shared - You choose who can view</SelectItem>
+              <SelectItem value="team">Team - All team members can view</SelectItem>
+              <SelectItem value="public">Public - Everyone can view</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="search-description">Description</Label>
+          <Textarea
+            id="search-description"
+            placeholder="Enter search description..."
+            value={searchDescription}
+            onChange={(e) => setSearchDescription(e.target.value)}
+            data-testid="input-search-description"
+            rows={3}
           />
         </div>
 
