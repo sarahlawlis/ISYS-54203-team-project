@@ -1,13 +1,22 @@
 import { useState } from "react";
 import { useRoute } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ArrowLeft, Edit, Calendar, Users } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Loader2, ArrowLeft, Edit, Calendar, Users, UserPlus } from "lucide-react";
 import { Link } from "wouter";
 import { CreateProjectDialog } from "@/components/CreateProjectDialog";
-import type { Project, Form, Workflow, ProjectWorkflow } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { Project, Form, Workflow, ProjectWorkflow, ProjectForm, User } from "@shared/schema";
 
 interface ProjectDetailResponse extends Project {
   forms: Form[];
@@ -19,11 +28,59 @@ export default function ProjectDetail() {
   const [, params] = useRoute("/projects/:id");
   const projectId = params?.id;
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const { toast } = useToast();
 
   const { data: project, isLoading } = useQuery<ProjectDetailResponse>({
     queryKey: ["/api/projects", projectId],
     enabled: !!projectId,
   });
+
+  const { data: projectUsersData } = useQuery<{ projectUsers: any[], users: User[] }>({
+    queryKey: ["/api/projects", projectId, "users"],
+    queryFn: async () => {
+      const response = await fetch(`/api/projects/${projectId}/users`);
+      if (!response.ok) throw new Error("Failed to fetch project users");
+      return response.json();
+    },
+    enabled: !!projectId,
+  });
+
+  const { data: projectForms = [] } = useQuery<ProjectForm[]>({
+    queryKey: ["/api/projects", projectId, "forms"],
+    queryFn: async () => {
+      const response = await fetch(`/api/projects/${projectId}/forms`);
+      if (!response.ok) throw new Error("Failed to fetch project forms");
+      return response.json();
+    },
+    enabled: !!projectId,
+  });
+
+  const assignFormMutation = useMutation({
+    mutationFn: async ({ formId, userId }: { formId: string; userId: string | null }) => {
+      const response = await apiRequest("PUT", `/api/projects/${projectId}/forms/${formId}`, {
+        assignedUserId: userId,
+      });
+      if (!response.ok) throw new Error("Failed to assign user to form");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "forms"] });
+      toast({
+        title: "Success",
+        description: "Form assignment updated successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update form assignment",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const assignedUsers = projectUsersData?.users || [];
+  const assignedUsernames = assignedUsers.map(u => u.username);
 
   if (isLoading) {
     return (
@@ -140,11 +197,21 @@ export default function ProjectDetail() {
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
                   <Users className="h-4 w-4" />
-                  Team Size
+                  Assigned Users
                 </h3>
-                <p className="text-sm" data-testid="text-team-size">
-                  {project.teamSize || "0"} members
-                </p>
+                {assignedUsers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground" data-testid="text-assigned-users">
+                    No users assigned
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-1" data-testid="text-assigned-users">
+                    {assignedUsers.map((user) => (
+                      <Badge key={user.id} variant="secondary">
+                        {user.username}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
@@ -163,22 +230,56 @@ export default function ProjectDetail() {
                 <p className="text-sm text-muted-foreground">No forms connected</p>
               ) : (
                 <div className="space-y-2">
-                  {project.forms.map((form) => (
-                    <div
-                      key={form.id}
-                      className="flex items-start gap-3 p-3 rounded-md border hover-elevate"
-                      data-testid={`card-form-${form.id}`}
-                    >
-                      <div className="flex-1">
-                        <h4 className="text-sm font-medium">{form.name}</h4>
-                        {form.description && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {form.description}
-                          </p>
-                        )}
+                  {project.forms.map((form) => {
+                    const projectForm = projectForms.find(pf => pf.formId === form.id);
+                    const assignedUser = projectForm?.assignedUserId
+                      ? assignedUsers.find(u => u.id === projectForm.assignedUserId)
+                      : null;
+
+                    return (
+                      <div
+                        key={form.id}
+                        className="flex items-start gap-3 p-3 rounded-md border hover-elevate"
+                        data-testid={`card-form-${form.id}`}
+                      >
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium">{form.name}</h4>
+                          {form.description && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {form.description}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-1 min-w-[180px]">
+                          <label className="text-xs text-muted-foreground">Assigned to:</label>
+                          <Select
+                            value={projectForm?.assignedUserId || "unassigned"}
+                            onValueChange={(value) => {
+                              if (projectForm) {
+                                assignFormMutation.mutate({
+                                  formId: form.id,
+                                  userId: value === "unassigned" ? null : value,
+                                });
+                              }
+                            }}
+                            disabled={assignFormMutation.isPending}
+                          >
+                            <SelectTrigger data-testid={`select-form-user-${form.id}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="unassigned">Unassigned</SelectItem>
+                              {assignedUsers.map((user) => (
+                                <SelectItem key={user.id} value={user.id}>
+                                  {user.username}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -242,8 +343,9 @@ export default function ProjectDetail() {
             name: project.name,
             description: project.description,
             status: project.status as "planning" | "active" | "on-hold" | "completed",
-            teamSize: project.teamSize,
             dueDate: project.dueDate,
+            ownerId: project.ownerId,
+            userIds: assignedUsers.map(u => u.id),
             formIds: project.forms.map(f => f.id),
             workflowIds: project.workflows.map(w => w.id),
           } : undefined}

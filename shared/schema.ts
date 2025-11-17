@@ -90,7 +90,6 @@ export const projects = pgTable("projects", {
   description: text("description"),
   status: text("status").notNull().default('planning'),
   dueDate: text("due_date"),
-  teamSize: text("team_size").notNull().default('0'),
   ownerId: varchar("owner_id").notNull(),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -107,10 +106,26 @@ export const insertProjectSchema = createInsertSchema(projects).omit({
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;
 
+export const projectUsers = pgTable("project_users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  assignedAt: text("assigned_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const insertProjectUserSchema = createInsertSchema(projectUsers).omit({
+  id: true,
+  assignedAt: true,
+});
+
+export type InsertProjectUser = z.infer<typeof insertProjectUserSchema>;
+export type ProjectUser = typeof projectUsers.$inferSelect;
+
 export const projectForms = pgTable("project_forms", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id").notNull(),
   formId: varchar("form_id").notNull(),
+  assignedUserId: varchar("assigned_user_id"),
   assignedAt: text("assigned_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 

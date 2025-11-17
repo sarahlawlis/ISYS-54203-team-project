@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertAttributeSchema, insertFormSchema, insertWorkflowSchema, insertProjectSchema, insertProjectFormSchema, insertProjectWorkflowSchema, insertFormSubmissionSchema, insertUserSchema, loginUserSchema, insertSavedSearchSchema } from "@shared/schema";
+import { insertAttributeSchema, insertFormSchema, insertWorkflowSchema, insertProjectSchema, insertProjectUserSchema, insertProjectFormSchema, insertProjectWorkflowSchema, insertFormSubmissionSchema, insertUserSchema, loginUserSchema, insertSavedSearchSchema } from "@shared/schema";
 import { hashPassword, verifyPassword, sanitizeUser, isAdmin } from "./auth";
 import { requirePermission, requireRole, canModifyProject } from "./permissions";
 import "./types";
@@ -550,9 +550,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { formIds, workflowIds, ...projectData } = req.body;
+      const { userIds, formIds, workflowIds, ...projectData } = req.body;
       const validatedData = insertProjectSchema.partial().parse(projectData);
       const updatedProject = await storage.updateProject(req.params.id, validatedData);
+
+      if (userIds !== undefined) {
+        const existingUsers = await storage.getProjectUsers(req.params.id);
+        const existingUserIds = existingUsers.map(pu => pu.userId);
+
+        const usersToAdd = userIds.filter((id: string) => !existingUserIds.includes(id));
+        const usersToRemove = existingUserIds.filter(id => !userIds.includes(id));
+
+        await Promise.all([
+          ...usersToAdd.map((userId: string) => storage.addProjectUser({ projectId: req.params.id, userId })),
+          ...usersToRemove.map((userId: string) => storage.removeProjectUser(req.params.id, userId)),
+        ]);
+      }
 
       if (formIds !== undefined) {
         const existingForms = await storage.getProjectForms(req.params.id);
@@ -706,35 +719,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // User-Project assignment routes
-  app.get("/api/users/:userId/projects", requireAuth, async (req, res) => {
-    try {
-      const currentUser = (req as any).user;
-
-      // Users can view their own projects, admins can view any user's projects
-      if (currentUser.role !== 'admin' && currentUser.id !== req.params.userId) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      const userProjects = await storage.getUserProjects(req.params.userId);
-      res.json(userProjects);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch user projects" });
-    }
-  });
-
+  // Project Users routes
   app.get("/api/projects/:projectId/users", requireAuth, async (req, res) => {
     try {
-      const currentUser = (req as any).user;
-
-      // Check if user has access to this project
-      const access = await storage.checkUserProjectAccess(currentUser.id, req.params.projectId);
-      if (!access && currentUser.role !== 'admin') {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
       const projectUsers = await storage.getProjectUsers(req.params.projectId);
-      res.json(projectUsers);
+      
+      const userIds = projectUsers.map(pu => pu.userId);
+      const users = await Promise.all(userIds.map(id => storage.getUser(id)));
+      
+      res.json({
+        projectUsers,
+        users: users.filter(u => u !== undefined).map(u => {
+          const { password, ...sanitized } = u!;
+          return sanitized;
+        }),
+      });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch project users" });
     }
@@ -742,21 +741,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/projects/:projectId/users", requireAuth, async (req, res) => {
     try {
-      const currentUser = (req as any).user;
-
-      // Check if user has owner/editor access or is admin
-      const access = await storage.checkUserProjectAccess(currentUser.id, req.params.projectId);
-      if ((!access || (access.role !== 'owner' && access.role !== 'editor')) && currentUser.role !== 'admin') {
-        return res.status(403).json({ error: "Insufficient permissions" });
+      const user = req.user!;
+      const project = await storage.getProjectById(req.params.projectId);
+      
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
       }
 
-      const validatedData = insertUserProjectSchema.parse({
+      if (!canModifyProject(user, project.ownerId)) {
+        return res.status(403).json({ 
+          error: "Insufficient permissions",
+          message: "Only project owners and admins can assign users",
+        });
+      }
+
+      const validatedData = insertProjectUserSchema.parse({
         ...req.body,
         projectId: req.params.projectId,
       });
 
-      const userProject = await storage.addUserToProject(validatedData);
-      res.status(201).json(userProject);
+      const projectUser = await storage.addProjectUser(validatedData);
+      res.status(201).json(projectUser);
     } catch (error) {
       res.status(400).json({ error: "Invalid project user data" });
     }
@@ -764,18 +769,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/projects/:projectId/users/:userId", requireAuth, async (req, res) => {
     try {
-      const currentUser = (req as any).user;
-
-      // Check if user has owner access or is admin
-      const access = await storage.checkUserProjectAccess(currentUser.id, req.params.projectId);
-      if ((!access || access.role !== 'owner') && currentUser.role !== 'admin') {
-        return res.status(403).json({ error: "Only project owners can remove users" });
+      const user = req.user!;
+      const project = await storage.getProjectById(req.params.projectId);
+      
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
       }
 
-      await storage.removeUserFromProject(req.params.userId, req.params.projectId);
+      if (!canModifyProject(user, project.ownerId)) {
+        return res.status(403).json({ 
+          error: "Insufficient permissions",
+          message: "Only project owners and admins can remove users",
+        });
+      }
+
+      await storage.removeProjectUser(req.params.projectId, req.params.userId);
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to remove user from project" });
+    }
+  });
+
+  app.put("/api/projects/:projectId/forms/:formId", requireAuth, async (req, res) => {
+    try {
+      const user = req.user!;
+      const project = await storage.getProjectById(req.params.projectId);
+      
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      if (!canModifyProject(user, project.ownerId)) {
+        return res.status(403).json({ 
+          error: "Insufficient permissions",
+          message: "Only project owners and admins can assign forms to users",
+        });
+      }
+
+      const projectForms = await storage.getProjectForms(req.params.projectId);
+      const projectForm = projectForms.find(pf => pf.formId === req.params.formId);
+      
+      if (!projectForm) {
+        return res.status(404).json({ error: "Form not found in project" });
+      }
+
+      const validatedData = insertProjectFormSchema.partial().parse(req.body);
+      const updatedProjectForm = await storage.updateProjectForm(projectForm.id, validatedData);
+      res.json(updatedProjectForm);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid form assignment data" });
     }
   });
 
