@@ -1,7 +1,7 @@
 # Avery's Development Log
 ## FlowForge ISYS-54203 Team Project
 
-*Last Updated: November 15, 2025 @ 7:45 PM CST*
+*Last Updated: November 17, 2025 @ 10:15 PM CST*
 
 ---
 
@@ -155,6 +155,187 @@ Each entry contains:
 ---
 
 ## Development Sessions
+
+### Session 4: November 17, 2025 @ 9:30 PM CST
+**Branch:** main
+
+#### Entry 4.1 - Documentation Housekeeping and Wiki Content Creation
+**Date & Time:** November 17, 2025 @ 9:30 PM - 10:15 PM CST
+
+**Purpose/Reason:**
+- Consolidate duplicate development log files (AveryReadMe.md and AverysLog.md)
+- Create comprehensive wiki content for GitHub wiki update
+- Improve project documentation structure and accessibility
+- Provide technical documentation for team and future contributors
+
+**Changes Made:**
+
+**1. Development Log Consolidation (9:30 PM - 9:50 PM):**
+- Merged content from AveryReadMe.md into AverysLog.md
+- Integrated November 11, 2025 development session as Entry 1.6
+- Added Entry 1.4 for November 13 Git Repository Management
+- Maintained reverse chronological order (newest entries at top)
+- Preserved all technical details, timestamps, and commit hashes
+- Updated "Last Updated" timestamp to November 17, 2025 @ 9:45 PM CST
+- Deleted AveryReadMe.md after successful merge
+
+**2. Wiki Content Creation (9:50 PM - 10:15 PM):**
+- Created comprehensive WIKI_CONTENT.md file with 6 wiki pages:
+
+  **Page 1: Home**
+  - Updated project overview with current status (November 17, 2025)
+  - Listed all 6 core features with implementation status
+  - Added recent activity summary (November 11-15, 2025)
+  - Updated technical stack with exact version numbers
+  - Added quick links to other wiki pages
+  - Included smart values definitions
+
+  **Page 2: Architecture**
+  - Complete system architecture documentation
+  - Architecture diagrams (client-server-database)
+  - Directory structure overview
+  - Frontend architecture (React, Vite, TanStack Query)
+  - Backend architecture (Express, Drizzle, RBAC)
+  - Database architecture and ORM choice
+  - Authentication & authorization flow
+  - Data flow examples
+  - Performance considerations
+  - Security architecture
+  - Future architecture considerations
+
+  **Page 3: Database Schema**
+  - Entity relationship diagram
+  - Complete table definitions with TypeScript schemas
+  - All 11 tables documented:
+    - users, projects, forms, workflows, attributes
+    - projectUsers, projectForms, projectWorkflows
+    - formSubmissions, savedSearches, auditLogs
+  - Indexes and relationships
+  - Common query patterns with examples
+  - Migration history
+  - Future schema enhancements
+
+  **Page 4: API Documentation**
+  - Complete REST API endpoint documentation
+  - Authentication endpoints (register, login, logout, me, password)
+  - User management endpoints (admin only)
+  - Projects CRUD with user assignment
+  - Forms, workflows, attributes endpoints
+  - Saved searches complete API
+  - Form submissions
+  - Audit logs
+  - Request/response examples for all endpoints
+  - Error response format and status codes
+
+  **Page 5: Saved Search Feature**
+  - Detailed feature documentation
+  - Implementation status and recent updates
+  - Complete pending tasks list (Tasks 1-11)
+  - Technical implementation details
+  - Frontend component breakdown
+  - Backend execution flow with code examples
+  - Supported operators (string, date, smart value)
+  - Database schema and filter structure
+  - Usage examples (3 detailed scenarios)
+  - Recent commits
+  - Future enhancements
+
+  **Page 6: Getting Started**
+  - Complete setup and installation guide
+  - Prerequisites and installation steps
+  - Environment configuration (.env setup)
+  - Database setup (Neon and local PostgreSQL options)
+  - Running in development and production modes
+  - First-time setup instructions
+  - Common tasks and troubleshooting
+  - Development workflow
+  - Helpful commands reference
+  - Project structure overview
+  - Links to additional resources
+
+**Outcome:**
+✅ Development logs successfully consolidated
+- AveryReadMe.md content merged into AverysLog.md as Entry 1.6
+- Timeline integrity maintained (newest at top, oldest at bottom)
+- All technical details preserved
+- AveryReadMe.md deleted
+
+✅ Comprehensive wiki content created
+- 6 complete wiki pages ready for GitHub wiki
+- Updated with current project status (November 17, 2025)
+- All features documented with implementation status
+- Complete technical documentation (architecture, database, API)
+- Saved Search feature thoroughly documented with pending tasks
+- Getting Started guide for new developers
+- Content formatted for easy copy/paste into GitHub wiki editor
+
+✅ Documentation structure improved
+- Clear separation between development log (AverysLog.md) and wiki content (WIKI_CONTENT.md)
+- Wiki content follows existing format from GitHub wiki Home page
+- Consistent markdown formatting across all pages
+- Cross-page links using [[Page Name]] syntax
+- Code examples and diagrams included
+
+**Implementation Details:**
+
+**File Operations:**
+- Merged: AveryReadMe.md → AverysLog.md (Session 1, Entry 1.6)
+- Deleted: AveryReadMe.md
+- Created: WIKI_CONTENT.md (6 pages, ~850 lines)
+- Updated: AverysLog.md (timestamp and this entry)
+
+**Wiki Content Structure:**
+Each page clearly marked with:
+- Page number and title
+- Section headers with ---
+- Consistent formatting
+- Ready for copy/paste into GitHub wiki editor
+
+**Documentation Coverage:**
+- Project overview and vision
+- All 6 core features with status
+- Complete technical stack documentation
+- System architecture with diagrams
+- Database schema with ERD and table definitions
+- REST API with all endpoints documented
+- Saved Search feature deep dive
+- Complete setup and installation guide
+
+**Additional Notes:**
+**Files Modified:**
+1. AverysLog.md - Updated timestamp, added Entry 4.1, merged content from AveryReadMe.md
+2. WIKI_CONTENT.md - Created new file with 6 wiki pages
+
+**GitHub Wiki Update Instructions:**
+1. Go to https://github.com/sarahlawlis/ISYS-54203-team-project/wiki
+2. For each page in WIKI_CONTENT.md:
+   - Click "New Page" or edit existing page
+   - Copy content from WIKI_CONTENT.md
+   - Paste into wiki editor
+   - Save page
+3. Update Home page to replace outdated October 6, 2025 content
+4. Create new pages: Architecture, Database Schema, API Documentation, Saved Search Feature, Getting Started
+
+**Wiki Maintenance:**
+- Wiki content is based on current state as of November 17, 2025
+- Future updates should be made both in wiki and relevant project documentation
+- Consider automating wiki updates from documentation files
+
+**Next Steps:**
+- User to copy/paste wiki content into GitHub wiki
+- Consider creating additional wiki pages:
+  - User Guide (end-user documentation)
+  - Development Guide (contributor guidelines)
+  - Deployment Guide (production deployment)
+  - Troubleshooting Guide (common issues)
+
+**Future Enhancements:**
+- Automated wiki generation from code comments
+- Wiki page for design guidelines
+- Wiki page for testing strategy
+- Screenshots and diagrams for User Guide
+
+---
 
 ### Session 3: November 15, 2025 @ 7:15 PM CST
 **Branch:** SavedSearchFeature
@@ -684,8 +865,207 @@ Each entry contains:
 
 ---
 
-### Session 1: November 13, 2025 @ 10:17 PM CST
+### Session 1: November 11-13, 2025
 **Branch:** SavedSearchFeature
+
+#### Entry 1.6 - November 11 Development Session Overview
+**Date & Time:** November 11, 2025 @ 7:56 PM - 10:30 PM CST
+
+**Purpose/Reason:**
+- Implement and debug saved search execution functionality
+- Add field mapping for dynamic metadata building
+- Enhance operator support for search filters
+- Test and validate search feature end-to-end
+
+**Session Summary:**
+- **Duration:** 2 hours 34 minutes (7:56 PM - 10:30 PM CST)
+- **Active Development Time:** Approximately 2 hours 15 minutes
+- **Lines of Code Modified:** ~80 lines in server/routes.ts
+- **Commits Created:** 1 comprehensive commit (e45dd00)
+- **Issues Resolved:** 4 major issues (field mapping, operator support, async refactor, logging)
+- **Server Restarts Required:** 4 manual restarts due to tsx watch mode issues
+
+**Changes Made:**
+
+**1. Server Restart and Initial Testing (8:00 PM CST):**
+- Identified running process on port 5000 (PID: 40056)
+- Terminated existing server process
+- Started fresh development server with `npm run dev`
+
+**2. Search Execution Testing - "Created By" Field (8:05 PM - 8:30 PM CST):**
+- Issue: "created by" field not appearing in search results
+- Root cause: Field name `created_by` doesn't exist in project schema
+- Analysis revealed actual field is `ownerId` (needs mapping to username)
+
+**Project Schema Fields:**
+- id, name, description, status, dueDate, teamSize
+- ownerId (actual field for project creator)
+- createdAt, updatedAt
+
+**3. Adding "is" Operator Support (8:35 PM CST):**
+- **File Modified:** server/routes.ts (lines 886-889)
+- Issue: "is" operator not recognized in switch statement
+- Server logs showed: "Unknown operator: is, defaulting to true"
+- **Code Changes:**
+  ```typescript
+  case 'equals':
+  case 'is': // 'is' operator works the same as 'equals'
+    if (!filterValue) return true;
+    return String(fieldValue || '').toLowerCase() === filterValue.toLowerCase();
+  ```
+- Outcome: "is" operator now functions identically to "equals"
+
+**4. Mapping "created_by" to Owner Username (8:45 PM - 9:15 PM CST):**
+- **File Modified:** server/routes.ts (lines 923-954)
+- Technical Challenge: Need to lookup user from `ownerId` to get username
+- Required converting synchronous metadata building to async
+- **Code Changes:**
+  - Converted metadata building to async function with `Promise.all()`
+  - Added special handling for "created_by" field:
+    ```typescript
+    // Map 'created_by' to owner information
+    if (filter.field === 'created_by') {
+      // Get the owner user to show their username
+      const owner = await storage.getUser(p.ownerId);
+      fieldValue = owner?.username || p.ownerId;
+    } else {
+      fieldValue = (p as any)[filter.field];
+    }
+    ```
+- Outcome: Successfully resolves owner usernames from user IDs
+- Falls back to ownerId if user lookup fails
+
+**5. Enhanced Debug Logging (Throughout Session):**
+- Added comprehensive logging for troubleshooting:
+  - Filter execution details
+  - Field value resolution
+  - Metadata building process
+  - Unknown operator warnings
+- Example logs:
+  ```
+  Executing search with filters: [detailed JSON]
+  Found 2 total projects
+  Adding field created_by with value: admin
+  Built metadata: { created_by: 'admin', name: 'Project Alpha' }
+  Matched 2 projects after filtering
+  Returning 2 total results
+  ```
+
+**6. Multiple Server Restarts:**
+- Restart #1: 8:00 PM CST (PID: 40056)
+- Restart #2: 8:40 PM CST
+- Restart #3: 9:20 PM CST
+- Restart #4: 9:50 PM CST
+- Issue: tsx watch mode not detecting file modifications
+- Actions: Manual kill process and restart with `npm run dev`
+
+**7. Feature Validation and Testing (9:50 PM - 10:05 PM CST):**
+- **Test Cases:**
+  1. Search with "created by" field left blank
+  2. Verify project owner usernames display correctly
+  3. Confirm "is" operator functions properly
+  4. Check search results show proper metadata
+- **Results:** All test cases passed ✅
+
+**8. Git Operations (10:10 PM - 10:14 PM CST):**
+- Reviewed changes with `git diff`
+- Staged: `git add server/routes.ts`
+- Commit message:
+  ```
+  Add 'created_by' field mapping and 'is' operator support for search execution
+
+  - Add support for 'is' operator (treats it same as 'equals')
+  - Implement async user lookup to map 'created_by' field to owner username
+  - Convert metadata building to async with Promise.all() for concurrent user lookups
+  - Add debug logging for unknown operators
+  - Ensure search results show meaningful owner names instead of IDs
+  ```
+- Pushed to origin/SavedSearchFeature
+- Commit hash: e45dd00aa89f42b0e041c3458afd22120fbe0501
+
+**9. Server Shutdown (10:25 PM CST):**
+- Terminated process PID: 47456 cleanly
+
+**Outcome:**
+✅ "created_by" field mapping implemented with async user lookup
+✅ "is" operator support added
+✅ Enhanced debug logging for troubleshooting
+✅ Metadata building converted to async with Promise.all()
+✅ All changes committed and pushed to GitHub
+
+**Supported Search Operators:**
+- `contains`: Case-insensitive substring match
+- `equals`: Exact case-insensitive match
+- `is`: Alias for equals (newly added this session)
+- `not_equals`: Case-insensitive non-match
+- `not_contains`: Substring not present
+- `starts_with`: Prefix match
+- `ends_with`: Suffix match
+- `is_empty`: Field is null, undefined, or empty string
+- `is_not_empty`: Field has a value
+
+**Challenges and Solutions:**
+
+**Challenge 1: tsx Watch Mode Not Reloading**
+- Problem: Code changes weren't being detected by development server
+- Solution: Manual server restarts by killing process and restarting npm
+- Prevention: May need to investigate tsx configuration or file watching settings
+
+**Challenge 2: Field Name Mismatch**
+- Problem: "created_by" field doesn't exist on project schema
+- Solution: Implemented field mapping to resolve "created_by" to "ownerId" with user lookup
+- Learning: Always verify field names against actual schema before implementing features
+
+**Challenge 3: Synchronous to Asynchronous Refactor**
+- Problem: User lookup is async but metadata building was sync
+- Solution: Refactored metadata building to use async/await with Promise.all()
+- Benefit: Concurrent user lookups improve performance
+
+**Challenge 4: Missing Operator Support**
+- Problem: "is" operator wasn't recognized in switch statement
+- Solution: Added "is" case alongside "equals" case
+- Learning: Ensure all expected operators are handled in switch statements
+
+**Performance Considerations:**
+- Using `Promise.all()` for concurrent lookups prevents sequential delays
+- Each project's owner lookup happens in parallel
+- Fallback to ownerId prevents failures if user lookup fails
+- All filters evaluated in memory after database fetch
+- Short-circuit evaluation with `every()` stops at first non-match
+
+**Additional Notes:**
+**Files Modified:**
+1. server/routes.ts - Lines 886-889 (is operator), Line 914 (debug logging), Lines 923-954 (async metadata with user lookup), Lines 932-936 (created_by field mapping)
+
+**Key Technical Concepts:**
+- Async/Await with Promise.all() for concurrent user lookups
+- Dynamic field access using TypeScript `as any` for flexible field access
+- Operator pattern matching with switch statement
+- Fallback values using `||` operator for graceful degradation
+- Session-based authentication with requireAuth middleware
+- RESTful API design
+
+**Future Enhancements:**
+1. Field name standardization - create field mapping configuration
+2. Caching user lookups for frequently accessed user data
+3. Type safety - add proper TypeScript types for dynamic field access
+4. Error handling - add try-catch blocks around user lookups
+5. Task and file filtering - extend search to support other entity types
+
+**Known Limitations:**
+1. tsx watch mode reliability issues requiring manual restarts
+2. Dynamic field access using `as any` reduces type safety
+3. All filtering happens in memory (not optimized for large datasets)
+4. No pagination implemented for search results
+
+**Status at Session End:**
+- All planned features implemented and tested
+- No known bugs or issues remaining
+- Code successfully pushed to remote repository
+- Development environment cleanly shut down
+- Ready for code review and potential merge to main branch
+
+---
 
 #### Entry 1.5 - Implement Smart Values Processing
 **Date & Time:** November 13, 2025 @ 11:00 PM CST
@@ -777,7 +1157,32 @@ Each entry contains:
 
 ---
 
-#### Entry 1.4 - Implement Delete Functionality for Saved Searches
+#### Entry 1.4 - Git Repository Management (November 13)
+**Date & Time:** November 13, 2025 @ 1:05 PM CST
+
+**Purpose/Reason:**
+- Commit development documentation to SavedSearchFeature branch
+- Sync local changes with remote GitHub repository
+
+**Changes Made:**
+- Committed AveryReadMe.md (development log from November 11, 2025 session)
+- Pulled remote changes from origin/SavedSearchFeature
+- Merged remote changes (.replit file update)
+- Pushed merged commits to GitHub
+
+**Outcome:**
+- Successfully pushed to sarahlawlis/ISYS-54203-team-project repository
+- SavedSearchFeature branch is up to date with remote
+- Working tree is clean with no uncommitted changes
+
+**Additional Notes:**
+- Required merge due to remote changes made between sessions
+- No conflicts encountered during merge
+- Commit includes Claude Code co-authorship attribution
+
+---
+
+#### Entry 1.3 - Implement Delete Functionality for Saved Searches
 **Date & Time:** November 13, 2025 @ 10:30 PM CST
 
 **Purpose/Reason:**
@@ -840,7 +1245,32 @@ Each entry contains:
 
 ---
 
-#### Entry 1.3 - Codebase Analysis & Task Planning
+#### Entry 1.2 - Development Server Setup (November 13)
+**Date & Time:** November 13, 2025 @ 10:17 PM CST
+
+**Purpose/Reason:**
+- Set up local development environment for testing and development
+- Resolve port conflicts from previous server instances
+
+**Changes Made:**
+- Identified and terminated processes occupying port 5000 (PIDs: 16948, 24228)
+- Started fresh development server with `npm run dev`
+- Configured Express backend with Vite HMR on port 5000
+
+**Outcome:**
+- Development server successfully running on http://localhost:5000
+- FlowForge application accessible with hot module reloading enabled
+- Both frontend (Vite) and backend (Express) operational
+
+**Additional Notes:**
+- Server runs in development mode with NODE_ENV=development
+- Vite provides instant HMR updates for frontend changes
+- Backend uses tsx watch mode for auto-restart on server changes
+- Database connection: Neon PostgreSQL (serverless)
+
+---
+
+#### Entry 1.1 - Codebase Analysis & Task Planning
 **Date & Time:** November 13, 2025 @ 10:25 PM CST
 
 **Purpose/Reason:**
@@ -873,56 +1303,6 @@ Each entry contains:
 - Components: client/src/components/SavedSearchCard.tsx, SavedSearchesTable.tsx
 - Backend: server/routes.ts (lines 783-978)
 - Schema: shared/schema.ts (lines 182-198), migrations/create_saved_searches.sql
-
----
-
-#### Entry 1.2 - Development Server Setup
-**Date & Time:** November 13, 2025 @ 10:17 PM CST
-
-**Purpose/Reason:**
-- Set up local development environment for testing and development
-- Resolve port conflicts from previous server instances
-
-**Changes Made:**
-- Identified and terminated processes occupying port 5000 (PIDs: 16948, 24228)
-- Started fresh development server with `npm run dev`
-- Configured Express backend with Vite HMR on port 5000
-
-**Outcome:**
-- Development server successfully running on http://localhost:5000
-- FlowForge application accessible with hot module reloading enabled
-- Both frontend (Vite) and backend (Express) operational
-
-**Additional Notes:**
-- Server runs in development mode with NODE_ENV=development
-- Vite provides instant HMR updates for frontend changes
-- Backend uses tsx watch mode for auto-restart on server changes
-- Database connection: Neon PostgreSQL (serverless)
-
----
-
-#### Entry 1.1 - Git Repository Management
-**Date & Time:** November 13, 2025 @ 1:05 PM CST
-
-**Purpose/Reason:**
-- Commit development documentation to SavedSearchFeature branch
-- Sync local changes with remote GitHub repository
-
-**Changes Made:**
-- Committed AveryReadMe.md (development log from November 11, 2025 session)
-- Pulled remote changes from origin/SavedSearchFeature
-- Merged remote changes (.replit file update)
-- Pushed merged commits to GitHub
-
-**Outcome:**
-- Successfully pushed to sarahlawlis/ISYS-54203-team-project repository
-- SavedSearchFeature branch is up to date with remote
-- Working tree is clean with no uncommitted changes
-
-**Additional Notes:**
-- Required merge due to remote changes made between sessions
-- No conflicts encountered during merge
-- Commit includes Claude Code co-authorship attribution
 
 ---
 
