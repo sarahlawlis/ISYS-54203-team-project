@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertAttributeSchema, insertFormSchema, insertWorkflowSchema, insertProjectSchema, insertProjectUserSchema, insertProjectFormSchema, insertProjectWorkflowSchema, insertFormSubmissionSchema, insertUserSchema, loginUserSchema, insertSavedSearchSchema } from "@shared/schema";
 import { hashPassword, verifyPassword, sanitizeUser, isAdmin } from "./auth";
 import { requirePermission, requireRole, canModifyProject } from "./permissions";
+import { generateAttributeEmbedding, findSimilarAttributes, serializeEmbedding, isAIConfigured } from "./ai-service";
 import "./types";
 
 // Middleware to check if user is authenticated and attach user to request
@@ -350,7 +351,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/attributes", requireAdmin, async (req, res) => {
     try {
       const validatedData = insertAttributeSchema.parse(req.body);
-      const attribute = await storage.createAttribute(validatedData);
+
+      // Generate embedding if AI is configured
+      let attributeData = { ...validatedData };
+      if (isAIConfigured()) {
+        try {
+          const embedding = await generateAttributeEmbedding(
+            validatedData.name,
+            validatedData.type,
+            validatedData.description
+          );
+          attributeData.embedding = serializeEmbedding(embedding);
+          attributeData.embeddingUpdatedAt = new Date().toISOString();
+        } catch (error) {
+          console.error("Error generating embedding:", error);
+          // Continue without embedding if generation fails
+        }
+      }
+
+      const attribute = await storage.createAttribute(attributeData);
       res.status(201).json(attribute);
     } catch (error) {
       res.status(400).json({ error: "Invalid attribute data" });
@@ -361,13 +380,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/attributes/:id", requireAdmin, async (req, res) => {
     try {
       const validatedData = insertAttributeSchema.parse(req.body);
-      const attribute = await storage.updateAttribute(req.params.id, validatedData);
+
+      // Regenerate embedding if AI is configured (name, type, or description changed)
+      let attributeData = { ...validatedData };
+      if (isAIConfigured()) {
+        try {
+          const embedding = await generateAttributeEmbedding(
+            validatedData.name,
+            validatedData.type,
+            validatedData.description
+          );
+          attributeData.embedding = serializeEmbedding(embedding);
+          attributeData.embeddingUpdatedAt = new Date().toISOString();
+        } catch (error) {
+          console.error("Error regenerating embedding:", error);
+          // Continue without updating embedding if generation fails
+        }
+      }
+
+      const attribute = await storage.updateAttribute(req.params.id, attributeData);
       if (!attribute) {
         return res.status(404).json({ error: "Attribute not found" });
       }
       res.json(attribute);
     } catch (error) {
       res.status(400).json({ error: "Invalid attribute data" });
+    }
+  });
+
+  // Check for similar attributes (AI-powered)
+  app.post("/api/attributes/check-similarity", requireAuth, async (req, res) => {
+    try {
+      // Check if AI is configured
+      if (!isAIConfigured()) {
+        return res.json([]);
+      }
+
+      const { name, type, description } = req.body;
+
+      if (!name || !type) {
+        return res.status(400).json({ error: "Name and type are required" });
+      }
+
+      // Get all existing attributes
+      const existingAttributes = await storage.getAttributes();
+
+      // Find similar attributes using AI
+      const similarAttributes = await findSimilarAttributes(
+        { name, type, description },
+        existingAttributes
+      );
+
+      // Remove similarity score before sending to frontend (as requested)
+      const attributesWithoutScores = similarAttributes.map(({ similarity, ...attr }) => attr);
+
+      res.json(attributesWithoutScores);
+    } catch (error) {
+      console.error("Error checking attribute similarity:", error);
+      // Return empty array on error for graceful degradation
+      res.json([]);
     }
   });
 

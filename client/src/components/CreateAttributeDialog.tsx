@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
+import { SimilarAttributesWarning } from "./SimilarAttributesWarning";
+import type { Attribute } from "@shared/schema";
 import {
   FileText,
   Calendar,
@@ -53,6 +55,9 @@ export function CreateAttributeDialog({ open, onOpenChange, editAttributeId }: C
   const [type, setType] = useState("");
   const [description, setDescription] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [similarAttributes, setSimilarAttributes] = useState<Attribute[]>([]);
+  const [isCheckingSimilarity, setIsCheckingSimilarity] = useState(false);
+  const [showWarning, setShowWarning] = useState(true);
 
   // Fetch attribute data when editing
   const { data: editAttribute } = useQuery({
@@ -76,8 +81,62 @@ export function CreateAttributeDialog({ open, onOpenChange, editAttributeId }: C
       setName("");
       setType("");
       setDescription("");
+      setSimilarAttributes([]);
+      setShowWarning(true);
     }
   }, [editAttribute, editAttributeId, open]);
+
+  // Debounced similarity check
+  const checkSimilarity = useCallback(
+    async (attributeName: string, attributeType: string, attributeDescription: string) => {
+      // Don't check if editing existing attribute
+      if (editAttributeId) return;
+
+      // Don't check if name or type is empty
+      if (!attributeName.trim() || !attributeType) {
+        setSimilarAttributes([]);
+        return;
+      }
+
+      setIsCheckingSimilarity(true);
+      setShowWarning(true);
+
+      try {
+        const response = await fetch("/api/attributes/check-similarity", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: attributeName,
+            type: attributeType,
+            description: attributeDescription || undefined,
+          }),
+          credentials: "include",
+        });
+
+        if (response.ok) {
+          const similar = await response.json();
+          setSimilarAttributes(similar);
+        } else {
+          setSimilarAttributes([]);
+        }
+      } catch (error) {
+        console.error("Error checking similarity:", error);
+        setSimilarAttributes([]);
+      } finally {
+        setIsCheckingSimilarity(false);
+      }
+    },
+    [editAttributeId]
+  );
+
+  // Debounce the similarity check (300ms delay)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      checkSimilarity(name, type, description);
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [name, type, description, checkSimilarity]);
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -148,7 +207,22 @@ export function CreateAttributeDialog({ open, onOpenChange, editAttributeId }: C
     setName("");
     setType("");
     setDescription("");
+    setSimilarAttributes([]);
+    setShowWarning(true);
     onOpenChange(false);
+  };
+
+  const handleUseExisting = (attribute: Attribute) => {
+    // Close dialog and let parent component handle adding the attribute
+    toast({
+      title: "Attribute Selected",
+      description: `Using existing attribute: ${attribute.name}`,
+    });
+    handleCancel();
+  };
+
+  const handleDismissWarning = () => {
+    setShowWarning(false);
   };
 
   return (
@@ -161,6 +235,15 @@ export function CreateAttributeDialog({ open, onOpenChange, editAttributeId }: C
         </DialogHeader>
 
         <div className="space-y-4 pt-4">
+          {/* Similar Attributes Warning */}
+          {!editAttributeId && showWarning && similarAttributes.length > 0 && (
+            <SimilarAttributesWarning
+              similarAttributes={similarAttributes}
+              onUseExisting={handleUseExisting}
+              onDismiss={handleDismissWarning}
+            />
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="attribute-name">
               Attribute Name <span className="text-destructive">*</span>
