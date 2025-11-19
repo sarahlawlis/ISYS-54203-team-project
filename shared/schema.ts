@@ -39,6 +39,8 @@ export const attributes = pgTable("attributes", {
   type: text("type").notNull(),
   description: text("description"),
   icon: text("icon").notNull(),
+  embedding: text("embedding"), // JSON string of embedding vector
+  embeddingUpdatedAt: text("embedding_updated_at"),
 });
 
 export const insertAttributeSchema = createInsertSchema(attributes).omit({
