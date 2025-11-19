@@ -7,8 +7,8 @@ const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 // Model for embeddings
 const EMBEDDING_MODEL = 'text-embedding-004';
 
-// Similarity threshold for detecting similar attributes (80%)
-const SIMILARITY_THRESHOLD = 0.80;
+// Similarity threshold for detecting similar attributes (60% - catches typos and variations)
+const SIMILARITY_THRESHOLD = 0.60;
 
 /**
  * Generate embedding vector for an attribute
