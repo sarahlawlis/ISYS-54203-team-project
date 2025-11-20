@@ -4,75 +4,44 @@ import { TaskCard } from "@/components/TaskCard";
 import { SavedSearchCard } from "@/components/SavedSearchCard";
 import { Button } from "@/components/ui/button";
 import { Plus, Folder, GitBranch, CheckCircle2, Clock } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import type { Project, SavedSearch } from "@shared/schema";
+import { Skeleton } from "@/components/ui/skeleton";
 
-//todo: remove mock functionality
-const mockProjects = [
-  {
-    id: "1",
-    name: "Customer Onboarding System",
-    description: "Streamline new customer intake with automated workflows",
-    status: "active" as const,
-    dueDate: "Dec 15, 2024",
-    teamSize: 5,
-    activeWorkflows: 3,
-  },
-  {
-    id: "2",
-    name: "Product Launch Campaign",
-    description: "Marketing workflow for Q1 product release",
-    status: "planning" as const,
-    dueDate: "Jan 20, 2025",
-    teamSize: 8,
-    activeWorkflows: 2,
-  },
-  {
-    id: "3",
-    name: "Employee Training Portal",
-    description: "Onboarding and continuous learning platform",
-    status: "active" as const,
-    dueDate: "Dec 30, 2024",
-    teamSize: 4,
-    activeWorkflows: 5,
-  },
-];
+type DashboardStats = {
+  activeProjectsCount: number;
+  workflowsCount: number;
+  completedFormsThisMonth: number;
+  pendingFormsCount: number;
+};
 
-const mockTasks = [
-  {
-    id: "1",
-    title: "Review documentation requirements",
-    project: "Customer Onboarding",
-    assignee: "Sarah Johnson",
-    dueDate: "Dec 12",
-    priority: "high" as const,
-    status: "in-progress" as const,
-  },
-  {
-    id: "2",
-    title: "Setup access credentials",
-    project: "Customer Onboarding",
-    assignee: "Mike Chen",
-    dueDate: "Dec 15",
-    priority: "medium" as const,
-    status: "pending" as const,
-  },
-];
-
-const mockSavedSearches = [
-  {
-    id: "1",
-    name: "High Priority Active Projects",
-    filters: "type:project, priority:high, status:active",
-    resultCount: 12,
-  },
-  {
-    id: "2",
-    name: "Overdue Tasks",
-    filters: "type:task, dueDate:<today",
-    resultCount: 5,
-  },
-];
+type AssignedForm = {
+  id: string;
+  projectId: string;
+  formId: string;
+  projectName: string;
+  formName: string;
+  assignedAt: string;
+  isCompleted: boolean;
+};
 
 export default function Dashboard() {
+  const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
+    queryKey: ['/api/dashboard/stats'],
+  });
+
+  const { data: recentProjects, isLoading: projectsLoading } = useQuery<Project[]>({
+    queryKey: ['/api/projects/recent'],
+  });
+
+  const { data: assignedForms, isLoading: formsLoading } = useQuery<AssignedForm[]>({
+    queryKey: ['/api/dashboard/assigned-forms'],
+  });
+
+  const { data: savedSearches, isLoading: searchesLoading } = useQuery<SavedSearch[]>({
+    queryKey: ['/api/saved-searches'],
+  });
+
   return (
     <div className="h-full overflow-auto">
       <div className="p-6 space-y-6">
@@ -90,33 +59,41 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatsCard
-            title="Active Projects"
-            value={24}
-            icon={Folder}
-            trend={{ value: 12, direction: "up" }}
-            subtitle="Across all teams"
-          />
-          <StatsCard
-            title="Workflows"
-            value={47}
-            icon={GitBranch}
-            subtitle="Ready to use"
-          />
-          <StatsCard
-            title="Completed Tasks"
-            value={156}
-            icon={CheckCircle2}
-            trend={{ value: 8, direction: "up" }}
-            subtitle="This month"
-          />
-          <StatsCard
-            title="Pending Tasks"
-            value={23}
-            icon={Clock}
-            trend={{ value: 5, direction: "down" }}
-            subtitle="Due this week"
-          />
+          {statsLoading ? (
+            <>
+              <Skeleton className="h-32" />
+              <Skeleton className="h-32" />
+              <Skeleton className="h-32" />
+              <Skeleton className="h-32" />
+            </>
+          ) : (
+            <>
+              <StatsCard
+                title="Active Projects"
+                value={stats?.activeProjectsCount ?? 0}
+                icon={Folder}
+                subtitle="Across all teams"
+              />
+              <StatsCard
+                title="Workflows"
+                value={stats?.workflowsCount ?? 0}
+                icon={GitBranch}
+                subtitle="Ready to use"
+              />
+              <StatsCard
+                title="Completed Forms"
+                value={stats?.completedFormsThisMonth ?? 0}
+                icon={CheckCircle2}
+                subtitle="This month"
+              />
+              <StatsCard
+                title="Pending Forms"
+                value={stats?.pendingFormsCount ?? 0}
+                icon={Clock}
+                subtitle="Assigned to you"
+              />
+            </>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -127,30 +104,89 @@ export default function Dashboard() {
                 View All
               </Button>
             </div>
-            <div className="grid gap-4">
-              {mockProjects.map((project) => (
-                <ProjectCard key={project.id} {...project} />
-              ))}
-            </div>
+            {projectsLoading ? (
+              <div className="grid gap-4">
+                <Skeleton className="h-32" />
+                <Skeleton className="h-32" />
+                <Skeleton className="h-32" />
+              </div>
+            ) : recentProjects && recentProjects.length > 0 ? (
+              <div className="grid gap-4">
+                {recentProjects.map((project) => (
+                  <ProjectCard
+                    key={project.id}
+                    id={project.id}
+                    name={project.name}
+                    description={project.description || ""}
+                    status={project.status as "active" | "planning" | "completed" | "on-hold"}
+                    dueDate={project.dueDate || ""}
+                    activeWorkflows={0}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No recent projects
+              </div>
+            )}
           </div>
 
           <div className="space-y-6">
             <div>
-              <h2 className="text-lg font-semibold mb-4">My Tasks</h2>
-              <div className="space-y-3">
-                {mockTasks.map((task) => (
-                  <TaskCard key={task.id} {...task} />
-                ))}
-              </div>
+              <h2 className="text-lg font-semibold mb-4">My Forms</h2>
+              {formsLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-24" />
+                  <Skeleton className="h-24" />
+                </div>
+              ) : assignedForms && assignedForms.length > 0 ? (
+                <div className="space-y-3">
+                  {assignedForms.map((form) => (
+                    <TaskCard
+                      key={form.id}
+                      id={form.id}
+                      title={form.formName}
+                      project={form.projectName}
+                      assignee=""
+                      dueDate=""
+                      priority="medium"
+                      status={form.isCompleted ? "completed" : "pending"}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No forms assigned
+                </div>
+              )}
             </div>
 
             <div>
               <h2 className="text-lg font-semibold mb-4">Saved Searches</h2>
-              <div className="space-y-3">
-                {mockSavedSearches.map((search) => (
-                  <SavedSearchCard key={search.id} {...search} />
-                ))}
-              </div>
+              {searchesLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-24" />
+                  <Skeleton className="h-24" />
+                </div>
+              ) : savedSearches && savedSearches.length > 0 ? (
+                <div className="space-y-3">
+                  {savedSearches.map((search) => (
+                    <SavedSearchCard
+                      key={search.id}
+                      id={search.id}
+                      name={search.name}
+                      description={search.description || undefined}
+                      visibility={search.visibility}
+                      filters={search.filters}
+                      resultCount={0}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No saved searches
+                </div>
+              )}
             </div>
           </div>
         </div>

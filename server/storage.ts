@@ -67,6 +67,23 @@ export interface IStorage {
   createSavedSearch(search: InsertSavedSearch): Promise<SavedSearch>;
   updateSavedSearch(id: string, search: Partial<InsertSavedSearch>): Promise<SavedSearch>;
   deleteSavedSearch(id: string): Promise<void>;
+
+  getDashboardStats(userId: string): Promise<{
+    activeProjectsCount: number;
+    workflowsCount: number;
+    completedFormsThisMonth: number;
+    pendingFormsCount: number;
+  }>;
+  getUserAssignedForms(userId: string): Promise<Array<{
+    id: string;
+    projectId: string;
+    formId: string;
+    projectName: string;
+    formName: string;
+    assignedAt: string;
+    isCompleted: boolean;
+  }>>;
+  getRecentProjects(limit?: number): Promise<Project[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -344,6 +361,123 @@ export class MemStorage implements IStorage {
 
   async deleteSavedSearch(id: string): Promise<void> {
     await db.delete(savedSearches).where(eq(savedSearches.id, id));
+  }
+
+  async getDashboardStats(userId: string): Promise<{
+    activeProjectsCount: number;
+    workflowsCount: number;
+    completedFormsThisMonth: number;
+    pendingFormsCount: number;
+  }> {
+    const activeProjectsResult = await db.select({ count: drizzleSql<number>`count(*)` })
+      .from(projects)
+      .where(eq(projects.status, 'active'));
+    
+    const workflowsResult = await db.select({ count: drizzleSql<number>`count(*)` })
+      .from(workflows);
+    
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    
+    const completedFormsResult = await db.select({ count: drizzleSql<number>`count(*)` })
+      .from(formSubmissions)
+      .where(
+        and(
+          eq(formSubmissions.submittedBy, userId),
+          drizzleSql`${formSubmissions.submittedAt} >= ${firstDayOfMonth}`
+        )
+      );
+    
+    const assignedFormsResult = await db.select({
+      projectId: projectForms.projectId,
+      formId: projectForms.formId,
+    })
+      .from(projectForms)
+      .where(eq(projectForms.assignedUserId, userId));
+    
+    const submissions = await db.select({
+      projectId: formSubmissions.projectId,
+      formId: formSubmissions.formId,
+    })
+      .from(formSubmissions)
+      .where(eq(formSubmissions.submittedBy, userId));
+    
+    const submittedSet = new Set(
+      submissions
+        .filter(s => s.projectId !== null && s.formId !== null)
+        .map(s => `${s.projectId}:${s.formId}`)
+    );
+    
+    const pendingCount = assignedFormsResult.filter(
+      af => !submittedSet.has(`${af.projectId}:${af.formId}`)
+    ).length;
+    
+    return {
+      activeProjectsCount: Number(activeProjectsResult[0]?.count || 0),
+      workflowsCount: Number(workflowsResult[0]?.count || 0),
+      completedFormsThisMonth: Number(completedFormsResult[0]?.count || 0),
+      pendingFormsCount: pendingCount,
+    };
+  }
+
+  async getUserAssignedForms(userId: string): Promise<Array<{
+    id: string;
+    projectId: string;
+    formId: string;
+    projectName: string;
+    formName: string;
+    assignedAt: string;
+    isCompleted: boolean;
+  }>> {
+    const assignedForms = await db
+      .select({
+        id: projectForms.id,
+        projectId: projectForms.projectId,
+        formId: projectForms.formId,
+        assignedAt: projectForms.assignedAt,
+      })
+      .from(projectForms)
+      .where(eq(projectForms.assignedUserId, userId));
+    
+    const submissions = await db
+      .select({
+        projectId: formSubmissions.projectId,
+        formId: formSubmissions.formId,
+      })
+      .from(formSubmissions)
+      .where(eq(formSubmissions.submittedBy, userId));
+    
+    const completedSet = new Set(
+      submissions
+        .filter(s => s.projectId !== null && s.formId !== null)
+        .map(s => `${s.projectId}:${s.formId}`)
+    );
+    
+    const result = await Promise.all(
+      assignedForms.map(async (pf) => {
+        const [project] = await db.select().from(projects).where(eq(projects.id, pf.projectId));
+        const [form] = await db.select().from(schema.forms).where(eq(schema.forms.id, pf.formId));
+        
+        return {
+          id: pf.id,
+          projectId: pf.projectId,
+          formId: pf.formId,
+          projectName: project?.name || 'Unknown Project',
+          formName: form?.name || 'Unknown Form',
+          assignedAt: pf.assignedAt,
+          isCompleted: completedSet.has(`${pf.projectId}:${pf.formId}`),
+        };
+      })
+    );
+    
+    return result;
+  }
+
+  async getRecentProjects(limit: number = 10): Promise<Project[]> {
+    return await db.select()
+      .from(projects)
+      .orderBy(drizzleSql`${projects.createdAt} DESC`)
+      .limit(limit);
   }
 }
 

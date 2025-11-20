@@ -1288,6 +1288,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/dashboard/stats", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const stats = await storage.getDashboardStats(userId);
+      res.json(stats);
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+      res.status(500).json({ error: "Failed to fetch dashboard stats" });
+    }
+  });
+
+  app.get("/api/dashboard/assigned-forms", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const assignedForms = await storage.getUserAssignedForms(userId);
+      res.json(assignedForms);
+    } catch (error) {
+      console.error('Error fetching assigned forms:', error);
+      res.status(500).json({ error: "Failed to fetch assigned forms" });
+    }
+  });
+
+  app.get("/api/projects/recent", requireAuth, async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+      const recentProjects = await storage.getRecentProjects(limit);
+      res.json(recentProjects);
+    } catch (error) {
+      console.error('Error fetching recent projects:', error);
+      res.status(500).json({ error: "Failed to fetch recent projects" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
