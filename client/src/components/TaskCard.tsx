@@ -8,8 +8,8 @@ export interface TaskCardProps {
   id: string;
   title: string;
   project: string;
-  assignee: string;
-  dueDate: string;
+  assignee?: string;
+  dueDate?: string;
   priority: "low" | "medium" | "high";
   status: "pending" | "in-progress" | "completed";
 }
@@ -37,10 +37,8 @@ export function TaskCard({
 }: TaskCardProps) {
   const StatusIcon = statusIcons[status];
   const initials = assignee
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase();
+    ? assignee.split(" ").map((n) => n[0]).join("").toUpperCase()
+    : "";
 
   return (
     <Card className="rounded-card hover-elevate" data-testid={`card-task-${id}`}>
@@ -56,18 +54,21 @@ export function TaskCard({
         </div>
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Avatar className="h-6 w-6">
-              <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-            </Avatar>
-            <span className="text-xs text-muted-foreground">{dueDate}</span>
+            {assignee && (
+              <Avatar className="h-6 w-6">
+                <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+              </Avatar>
+            )}
+            {dueDate && <span className="text-xs text-muted-foreground">{dueDate}</span>}
           </div>
           <div className="flex items-center gap-2">
-            <Badge className={`text-xs ${priorityColors[priority]}`}>
-              {priority}
-            </Badge>
-            <Button size="sm" variant="outline" data-testid={`button-complete-task-${id}`}>
-              Complete
-            </Button>
+            {status === "completed" ? (
+              <Badge className="text-xs bg-chart-2 text-white">Completed</Badge>
+            ) : (
+              <Button size="sm" variant="outline" data-testid={`button-complete-task-${id}`}>
+                Complete
+              </Button>
+            )}
           </div>
         </div>
       </CardContent>
