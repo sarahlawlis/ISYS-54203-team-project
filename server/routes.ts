@@ -1291,8 +1291,161 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dashboard/stats", requireAuth, async (req, res) => {
     try {
       const userId = req.session.userId!;
-      const stats = await storage.getDashboardStats(userId);
-      res.json(stats);
+      const savedSearchId = req.query.savedSearchId as string | undefined;
+
+      // If no saved search, return unfiltered stats
+      if (!savedSearchId) {
+        const stats = await storage.getDashboardStats(userId);
+        return res.json(stats);
+      }
+
+      // Get the saved search and apply its filters
+      const savedSearch = await storage.getSavedSearchById(savedSearchId);
+      if (!savedSearch) {
+        return res.status(404).json({ error: "Saved search not found" });
+      }
+
+      // Parse the filters from the saved search
+      const filters = JSON.parse(savedSearch.filters);
+
+      // Resolve smart values in project filters
+      if (filters.projectFilters) {
+        filters.projectFilters = filters.projectFilters.map((filter: any) => {
+          const valueToResolve = filter.smartValue || filter.value;
+          return {
+            ...filter,
+            value: typeof valueToResolve === 'string' ? resolveSmartValue(valueToResolve, userId) : valueToResolve
+          };
+        });
+      }
+
+      // Field name mapping (same as search execute)
+      const fieldMapping: Record<string, string> = {
+        'created_by': 'ownerId',
+        'last_modified': 'updatedAt',
+        'started': 'createdAt',
+        'due_date': 'dueDate',
+        'team_size': 'teamSize',
+      };
+
+      // Get all projects and filter them based on saved search criteria
+      const allProjects = await storage.getProjects();
+      let filteredProjects = allProjects;
+
+      if (filters.projectFilters && filters.projectFilters.length > 0) {
+        filteredProjects = allProjects.filter(project => {
+          return filters.projectFilters.every((filter: any) => {
+            const fieldName = fieldMapping[filter.field] || filter.field;
+            const fieldValue = (project as any)[fieldName];
+            const filterValue = filter.value;
+
+            // Check if filterValue is a date range object
+            const isDateRange = filterValue && typeof filterValue === 'object' && 'start' in filterValue && 'end' in filterValue;
+
+            // Handle date range filtering
+            if (isDateRange) {
+              const fieldDate = fieldValue ? new Date(fieldValue).getTime() : null;
+              if (!fieldDate) return false;
+
+              const startDate = new Date(filterValue.start).getTime();
+              const endDate = new Date(filterValue.end).getTime();
+
+              switch (filter.operator) {
+                case 'on':
+                case 'equals':
+                case 'is':
+                  return fieldDate >= startDate && fieldDate <= endDate;
+                case 'before':
+                  return fieldDate < startDate;
+                case 'after':
+                  return fieldDate > endDate;
+                case 'between':
+                  return fieldDate >= startDate && fieldDate <= endDate;
+                default:
+                  return true;
+              }
+            }
+
+            // Handle regular string filtering
+            const stringValue = filterValue?.trim ? filterValue.trim() : String(filterValue || '');
+
+            switch (filter.operator) {
+              case 'contains':
+                if (!stringValue) return true;
+                return String(fieldValue || '').toLowerCase().includes(stringValue.toLowerCase());
+              case 'equals':
+              case 'is':
+                if (!stringValue) return true;
+                return String(fieldValue || '').toLowerCase() === stringValue.toLowerCase();
+              case 'not_equals':
+              case 'is_not':
+                if (!stringValue) return true;
+                return String(fieldValue || '').toLowerCase() !== stringValue.toLowerCase();
+              case 'not_contains':
+                if (!stringValue) return true;
+                return !String(fieldValue || '').toLowerCase().includes(stringValue.toLowerCase());
+              case 'starts_with':
+                if (!stringValue) return true;
+                return String(fieldValue || '').toLowerCase().startsWith(stringValue.toLowerCase());
+              case 'ends_with':
+                if (!stringValue) return true;
+                return String(fieldValue || '').toLowerCase().endsWith(stringValue.toLowerCase());
+              case 'is_empty':
+                return !fieldValue || String(fieldValue).trim() === '';
+              case 'is_not_empty':
+                return fieldValue && String(fieldValue).trim() !== '';
+              default:
+                return true;
+            }
+          });
+        });
+      }
+
+      // Get IDs of filtered projects for use in other queries
+      const filteredProjectIds = new Set(filteredProjects.map(p => p.id));
+
+      // Calculate stats based on filtered projects
+      const activeProjectsCount = filteredProjects.filter(p => p.status === 'active').length;
+
+      // Get workflow instances assigned to filtered projects
+      const allProjectWorkflows = await Promise.all(
+        Array.from(filteredProjectIds).map(projectId => storage.getProjectWorkflows(projectId))
+      );
+      const workflowsCount = allProjectWorkflows.flat().length;
+
+      // Get completed forms this month (filtered by projects matching the search)
+      const allSubmissions = await storage.getFormSubmissions();
+      const now = new Date();
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const completedFormsThisMonth = allSubmissions.filter(s => 
+        s.submittedBy === userId &&
+        s.projectId && filteredProjectIds.has(s.projectId) &&
+        new Date(s.submittedAt) >= firstDayOfMonth
+      ).length;
+
+      // Get pending forms count (for filtered projects)
+      const allProjectForms = await Promise.all(
+        Array.from(filteredProjectIds).map(projectId => storage.getProjectForms(projectId))
+      );
+      const assignedForms = allProjectForms.flat().filter(pf => pf.assignedUserId === userId);
+      
+      const userSubmissions = allSubmissions.filter(s => s.submittedBy === userId);
+      const submittedSet = new Set(
+        userSubmissions
+          .filter(s => s.projectId !== null && s.formId !== null)
+          .map(s => `${s.projectId}:${s.formId}`)
+      );
+      
+      const pendingFormsCount = assignedForms.filter(
+        af => !submittedSet.has(`${af.projectId}:${af.formId}`)
+      ).length;
+
+      res.json({
+        activeProjectsCount,
+        workflowsCount,
+        completedFormsThisMonth,
+        pendingFormsCount,
+      });
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
       res.status(500).json({ error: "Failed to fetch dashboard stats" });
