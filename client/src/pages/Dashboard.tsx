@@ -3,10 +3,18 @@ import { ProjectCard } from "@/components/ProjectCard";
 import { TaskCard } from "@/components/TaskCard";
 import { SavedSearchCard } from "@/components/SavedSearchCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Folder, GitBranch, CheckCircle2, Clock } from "lucide-react";
+import { Plus, Folder, GitBranch, CheckCircle2, Clock, Filter, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Project, SavedSearch } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useState } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type DashboardStats = {
   activeProjectsCount: number;
@@ -26,8 +34,18 @@ type AssignedForm = {
 };
 
 export default function Dashboard() {
+  const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null);
+
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
-    queryKey: ['/api/dashboard/stats'],
+    queryKey: ['/api/dashboard/stats', selectedSearchId],
+    queryFn: async () => {
+      const url = selectedSearchId 
+        ? `/api/dashboard/stats?savedSearchId=${selectedSearchId}`
+        : '/api/dashboard/stats';
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch stats');
+      return response.json();
+    },
   });
 
   const { data: recentProjects, isLoading: projectsLoading } = useQuery<Project[]>({
@@ -42,6 +60,14 @@ export default function Dashboard() {
     queryKey: ['/api/saved-searches'],
   });
 
+  const selectedSearchName = selectedSearchId 
+    ? savedSearches?.find(s => s.id === selectedSearchId)?.name 
+    : null;
+
+  const getSubtitle = (defaultText: string) => {
+    return selectedSearchName ? `Filtered by "${selectedSearchName}"` : defaultText;
+  };
+
   return (
     <div className="h-full overflow-auto">
       <div className="p-6 space-y-6">
@@ -52,10 +78,50 @@ export default function Dashboard() {
               Welcome back! Here's your project overview
             </p>
           </div>
-          <Button data-testid="button-new-project">
-            <Plus className="h-4 w-4 mr-2" />
-            New Project
-          </Button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select 
+                value={selectedSearchId || "all"} 
+                onValueChange={(value) => setSelectedSearchId(value === "all" ? null : value)}
+              >
+                <SelectTrigger 
+                  className="w-[200px]" 
+                  data-testid="select-saved-search"
+                >
+                  <SelectValue placeholder="All Data" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" data-testid="select-option-all">
+                    All Data
+                  </SelectItem>
+                  {savedSearches?.map((search) => (
+                    <SelectItem 
+                      key={search.id} 
+                      value={search.id}
+                      data-testid={`select-option-search-${search.id}`}
+                    >
+                      {search.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedSearchId && (
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => setSelectedSearchId(null)}
+                  data-testid="button-clear-filter"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            <Button data-testid="button-new-project">
+              <Plus className="h-4 w-4 mr-2" />
+              New Project
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -72,25 +138,25 @@ export default function Dashboard() {
                 title="Active Projects"
                 value={stats?.activeProjectsCount ?? 0}
                 icon={Folder}
-                subtitle="Across all teams"
+                subtitle={getSubtitle("Across all teams")}
               />
               <StatsCard
                 title="Workflows"
                 value={stats?.workflowsCount ?? 0}
                 icon={GitBranch}
-                subtitle="Ready to use"
+                subtitle={getSubtitle("Ready to use")}
               />
               <StatsCard
                 title="Completed Forms"
                 value={stats?.completedFormsThisMonth ?? 0}
                 icon={CheckCircle2}
-                subtitle="This month"
+                subtitle={getSubtitle("This month")}
               />
               <StatsCard
                 title="Pending Forms"
                 value={stats?.pendingFormsCount ?? 0}
                 icon={Clock}
-                subtitle="Assigned to you"
+                subtitle={getSubtitle("Assigned to you")}
               />
             </>
           )}
