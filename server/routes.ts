@@ -562,7 +562,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const userId = req.session.userId!;
-      await storage.updateProjectUserLastAccess(req.params.id, userId);
+      const user = req.user!;
+      
+      const projectUsersList = await storage.getProjectUsers(req.params.id);
+      const isProjectMember = projectUsersList.some(pu => pu.userId === userId);
+      const isOwner = project.ownerId === userId;
+      const isAdminUser = user.role === 'admin';
+      
+      if (isProjectMember || isOwner || isAdminUser) {
+        await storage.updateProjectUserLastAccess(req.params.id, userId);
+      }
 
       const [projectForms, projectWorkflows] = await Promise.all([
         storage.getProjectForms(req.params.id),

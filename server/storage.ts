@@ -290,6 +290,7 @@ export class MemStorage implements IStorage {
     const [newProjectUser] = await db.insert(projectUsers).values({
       projectId,
       userId,
+      lastAccessedAt: drizzleSql`CURRENT_TIMESTAMP`,
     }).returning();
     return newProjectUser;
   }
@@ -511,13 +512,11 @@ export class MemStorage implements IStorage {
     const userProjectAccess = await db.select({
       projectId: projectUsers.projectId,
       lastAccessedAt: projectUsers.lastAccessedAt,
+      assignedAt: projectUsers.assignedAt,
     })
       .from(projectUsers)
-      .where(and(
-        eq(projectUsers.userId, userId),
-        drizzleSql`${projectUsers.lastAccessedAt} IS NOT NULL`
-      ))
-      .orderBy(drizzleSql`${projectUsers.lastAccessedAt} DESC`)
+      .where(eq(projectUsers.userId, userId))
+      .orderBy(drizzleSql`COALESCE(${projectUsers.lastAccessedAt}, ${projectUsers.assignedAt}) DESC`)
       .limit(limit);
     
     if (userProjectAccess.length === 0) {
