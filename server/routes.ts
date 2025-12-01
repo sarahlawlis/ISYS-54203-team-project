@@ -561,6 +561,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Project not found" });
       }
 
+      const userId = req.session.userId!;
+      await storage.updateProjectUserLastAccess(req.params.id, userId);
+
       const [projectForms, projectWorkflows] = await Promise.all([
         storage.getProjectForms(req.params.id),
         storage.getProjectWorkflows(req.params.id),
@@ -1465,8 +1468,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/projects/recent", requireAuth, async (req, res) => {
     try {
+      const userId = req.session.userId!;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
-      const recentProjects = await storage.getRecentProjects(limit);
+      const recentProjects = await storage.getRecentProjects(userId, limit);
       res.json(recentProjects);
     } catch (error) {
       console.error('Error fetching recent projects:', error);
