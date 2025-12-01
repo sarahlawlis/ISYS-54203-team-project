@@ -44,6 +44,8 @@ export interface IStorage {
   getProjectUsers(projectId: string): Promise<ProjectUser[]>;
   addProjectUser(projectUser: InsertProjectUser): Promise<ProjectUser>;
   removeProjectUser(projectId: string, userId: string): Promise<void>;
+  updateProjectUserLastAccess(projectId: string, userId: string): Promise<void>;
+  getOrCreateProjectUser(projectId: string, userId: string): Promise<ProjectUser>;
 
   getProjectForms(projectId: string): Promise<ProjectForm[]>;
   addProjectForm(projectForm: InsertProjectForm): Promise<ProjectForm>;
@@ -83,7 +85,7 @@ export interface IStorage {
     assignedAt: string;
     isCompleted: boolean;
   }>>;
-  getRecentProjects(limit?: number): Promise<Project[]>;
+  getRecentProjects(userId: string, limit?: number): Promise<Project[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -258,6 +260,39 @@ export class MemStorage implements IStorage {
   async removeProjectUser(projectId: string, userId: string): Promise<void> {
     await db.delete(projectUsers)
       .where(and(eq(projectUsers.projectId, projectId), eq(projectUsers.userId, userId)));
+  }
+
+  async updateProjectUserLastAccess(projectId: string, userId: string): Promise<void> {
+    const existing = await db.select().from(projectUsers)
+      .where(and(eq(projectUsers.projectId, projectId), eq(projectUsers.userId, userId)));
+    
+    if (existing.length > 0) {
+      await db.update(projectUsers)
+        .set({ lastAccessedAt: drizzleSql`CURRENT_TIMESTAMP` })
+        .where(and(eq(projectUsers.projectId, projectId), eq(projectUsers.userId, userId)));
+    } else {
+      await db.insert(projectUsers).values({
+        projectId,
+        userId,
+        lastAccessedAt: drizzleSql`CURRENT_TIMESTAMP`,
+      });
+    }
+  }
+
+  async getOrCreateProjectUser(projectId: string, userId: string): Promise<ProjectUser> {
+    const existing = await db.select().from(projectUsers)
+      .where(and(eq(projectUsers.projectId, projectId), eq(projectUsers.userId, userId)));
+    
+    if (existing.length > 0) {
+      return existing[0];
+    }
+    
+    const [newProjectUser] = await db.insert(projectUsers).values({
+      projectId,
+      userId,
+      lastAccessedAt: drizzleSql`CURRENT_TIMESTAMP`,
+    }).returning();
+    return newProjectUser;
   }
 
   async getProjectForms(projectId: string): Promise<ProjectForm[]> {
@@ -473,11 +508,28 @@ export class MemStorage implements IStorage {
     return result;
   }
 
-  async getRecentProjects(limit: number = 10): Promise<Project[]> {
-    return await db.select()
-      .from(projects)
-      .orderBy(drizzleSql`${projects.createdAt} DESC`)
+  async getRecentProjects(userId: string, limit: number = 10): Promise<Project[]> {
+    const userProjectAccess = await db.select({
+      projectId: projectUsers.projectId,
+      lastAccessedAt: projectUsers.lastAccessedAt,
+      assignedAt: projectUsers.assignedAt,
+    })
+      .from(projectUsers)
+      .where(eq(projectUsers.userId, userId))
+      .orderBy(drizzleSql`COALESCE(${projectUsers.lastAccessedAt}, ${projectUsers.assignedAt}) DESC`)
       .limit(limit);
+    
+    if (userProjectAccess.length === 0) {
+      return [];
+    }
+    
+    const projectIds = userProjectAccess.map(p => p.projectId);
+    const projectsList = await db.select()
+      .from(projects)
+      .where(drizzleSql`${projects.id} IN (${drizzleSql.join(projectIds.map(id => drizzleSql`${id}`), drizzleSql`,`)})`);
+    
+    const projectMap = new Map(projectsList.map(p => [p.id, p]));
+    return projectIds.map(id => projectMap.get(id)).filter((p): p is Project => p !== undefined);
   }
 }
 

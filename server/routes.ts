@@ -554,11 +554,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/projects/recent", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+      const recentProjects = await storage.getRecentProjects(userId, limit);
+      res.json(recentProjects);
+    } catch (error) {
+      console.error('Error fetching recent projects:', error);
+      res.status(500).json({ error: "Failed to fetch recent projects" });
+    }
+  });
+
   app.get("/api/projects/:id", requireAuth, async (req, res) => {
     try {
       const project = await storage.getProjectById(req.params.id);
       if (!project) {
         return res.status(404).json({ error: "Project not found" });
+      }
+
+      const userId = req.session.userId!;
+      const user = req.user!;
+      
+      const projectUsersList = await storage.getProjectUsers(req.params.id);
+      const isProjectMember = projectUsersList.some(pu => pu.userId === userId);
+      const isOwner = project.ownerId === userId;
+      const isAdminUser = user.role === 'admin';
+      
+      if (isProjectMember || isOwner || isAdminUser) {
+        await storage.updateProjectUserLastAccess(req.params.id, userId);
       }
 
       const [projectForms, projectWorkflows] = await Promise.all([
@@ -1460,17 +1484,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching assigned forms:', error);
       res.status(500).json({ error: "Failed to fetch assigned forms" });
-    }
-  });
-
-  app.get("/api/projects/recent", requireAuth, async (req, res) => {
-    try {
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
-      const recentProjects = await storage.getRecentProjects(limit);
-      res.json(recentProjects);
-    } catch (error) {
-      console.error('Error fetching recent projects:', error);
-      res.status(500).json({ error: "Failed to fetch recent projects" });
     }
   });
 
