@@ -176,9 +176,9 @@ Task: Suggest 3-5 attributes from the available list that would be most useful f
 
 Return ONLY the attribute names, one per line, no explanations or numbering.`;
 
-    // Call Gemini API
+    // Call Gemini API (using stable 1.5 Flash for reliability and higher rate limits)
     const result = await genAI.models.generateContent({
-      model: 'gemini-pro',
+      model: 'gemini-1.5-flash-latest',
       contents: { parts: [{ text: prompt }] }
     });
 
