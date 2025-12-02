@@ -1,3 +1,4 @@
+import { Switch, Route } from "wouter";
 import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";

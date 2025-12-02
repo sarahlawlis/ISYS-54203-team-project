@@ -51,7 +51,7 @@ const typeColors = {
 };
 
 export function AttributeCard({ id, name, type, usageCount, onEdit }: AttributeCardProps) {
-  const Icon = typeIcons[type] || Type;
+  const Icon = typeIcons[type] || FileText;
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const handleEdit = () => {
