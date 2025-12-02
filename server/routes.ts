@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertAttributeSchema, insertFormSchema, insertWorkflowSchema, insertProjectSchema, insertProjectUserSchema, insertProjectFormSchema, insertProjectWorkflowSchema, insertFormSubmissionSchema, insertUserSchema, loginUserSchema, insertSavedSearchSchema } from "@shared/schema";
 import { hashPassword, verifyPassword, sanitizeUser, isAdmin } from "./auth";
 import { requirePermission, requireRole, canModifyProject } from "./permissions";
+import { generateAttributeEmbedding, findSimilarAttributes, serializeEmbedding, isAIConfigured } from "./ai-service";
 import "./types";
 
 // Middleware to check if user is authenticated and attach user to request
@@ -350,7 +351,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/attributes", requireAdmin, async (req, res) => {
     try {
       const validatedData = insertAttributeSchema.parse(req.body);
-      const attribute = await storage.createAttribute(validatedData);
+
+      // Generate embedding if AI is configured
+      let attributeData = { ...validatedData };
+      if (isAIConfigured()) {
+        try {
+          const embedding = await generateAttributeEmbedding(
+            validatedData.name,
+            validatedData.type,
+            validatedData.description
+          );
+          attributeData.embedding = serializeEmbedding(embedding);
+          attributeData.embeddingUpdatedAt = new Date().toISOString();
+        } catch (error) {
+          console.error("Error generating embedding:", error);
+          // Continue without embedding if generation fails
+        }
+      }
+
+      const attribute = await storage.createAttribute(attributeData);
       res.status(201).json(attribute);
     } catch (error) {
       res.status(400).json({ error: "Invalid attribute data" });
@@ -361,13 +380,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/attributes/:id", requireAdmin, async (req, res) => {
     try {
       const validatedData = insertAttributeSchema.parse(req.body);
-      const attribute = await storage.updateAttribute(req.params.id, validatedData);
+
+      // Regenerate embedding if AI is configured (name, type, or description changed)
+      let attributeData = { ...validatedData };
+      if (isAIConfigured()) {
+        try {
+          const embedding = await generateAttributeEmbedding(
+            validatedData.name,
+            validatedData.type,
+            validatedData.description
+          );
+          attributeData.embedding = serializeEmbedding(embedding);
+          attributeData.embeddingUpdatedAt = new Date().toISOString();
+        } catch (error) {
+          console.error("Error regenerating embedding:", error);
+          // Continue without updating embedding if generation fails
+        }
+      }
+
+      const attribute = await storage.updateAttribute(req.params.id, attributeData);
       if (!attribute) {
         return res.status(404).json({ error: "Attribute not found" });
       }
       res.json(attribute);
     } catch (error) {
       res.status(400).json({ error: "Invalid attribute data" });
+    }
+  });
+
+  // Check for similar attributes (AI-powered)
+  app.post("/api/attributes/check-similarity", requireAuth, async (req, res) => {
+    try {
+      // Check if AI is configured
+      if (!isAIConfigured()) {
+        return res.json([]);
+      }
+
+      const { name, type, description } = req.body;
+
+      if (!name || !type) {
+        return res.status(400).json({ error: "Name and type are required" });
+      }
+
+      // Get all existing attributes
+      const existingAttributes = await storage.getAttributes();
+
+      // Find similar attributes using AI
+      const similarAttributes = await findSimilarAttributes(
+        { name, type, description },
+        existingAttributes
+      );
+
+      // Remove similarity score before sending to frontend (as requested)
+      const attributesWithoutScores = similarAttributes.map(({ similarity, ...attr }) => attr);
+
+      res.json(attributesWithoutScores);
+    } catch (error) {
+      console.error("Error checking attribute similarity:", error);
+      // Return empty array on error for graceful degradation
+      res.json([]);
     }
   });
 
@@ -483,11 +554,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/projects/recent", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+      const recentProjects = await storage.getRecentProjects(userId, limit);
+      res.json(recentProjects);
+    } catch (error) {
+      console.error('Error fetching recent projects:', error);
+      res.status(500).json({ error: "Failed to fetch recent projects" });
+    }
+  });
+
   app.get("/api/projects/:id", requireAuth, async (req, res) => {
     try {
       const project = await storage.getProjectById(req.params.id);
       if (!project) {
         return res.status(404).json({ error: "Project not found" });
+      }
+
+      const userId = req.session.userId!;
+      const user = req.user!;
+      
+      const projectUsersList = await storage.getProjectUsers(req.params.id);
+      const isProjectMember = projectUsersList.some(pu => pu.userId === userId);
+      const isOwner = project.ownerId === userId;
+      const isAdminUser = user.role === 'admin';
+      
+      if (isProjectMember || isOwner || isAdminUser) {
+        await storage.updateProjectUserLastAccess(req.params.id, userId);
       }
 
       const [projectForms, projectWorkflows] = await Promise.all([
@@ -1214,6 +1309,181 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error executing search:', error);
       res.status(500).json({ error: "Failed to execute search" });
+    }
+  });
+
+  app.get("/api/dashboard/stats", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const savedSearchId = req.query.savedSearchId as string | undefined;
+
+      // If no saved search, return unfiltered stats
+      if (!savedSearchId) {
+        const stats = await storage.getDashboardStats(userId);
+        return res.json(stats);
+      }
+
+      // Get the saved search and apply its filters
+      const savedSearch = await storage.getSavedSearchById(savedSearchId);
+      if (!savedSearch) {
+        return res.status(404).json({ error: "Saved search not found" });
+      }
+
+      // Parse the filters from the saved search
+      const filters = JSON.parse(savedSearch.filters);
+
+      // Resolve smart values in project filters
+      if (filters.projectFilters) {
+        filters.projectFilters = filters.projectFilters.map((filter: any) => {
+          const valueToResolve = filter.smartValue || filter.value;
+          return {
+            ...filter,
+            value: typeof valueToResolve === 'string' ? resolveSmartValue(valueToResolve, userId) : valueToResolve
+          };
+        });
+      }
+
+      // Field name mapping (same as search execute)
+      const fieldMapping: Record<string, string> = {
+        'created_by': 'ownerId',
+        'last_modified': 'updatedAt',
+        'started': 'createdAt',
+        'due_date': 'dueDate',
+        'team_size': 'teamSize',
+      };
+
+      // Get all projects and filter them based on saved search criteria
+      const allProjects = await storage.getProjects();
+      let filteredProjects = allProjects;
+
+      if (filters.projectFilters && filters.projectFilters.length > 0) {
+        filteredProjects = allProjects.filter(project => {
+          return filters.projectFilters.every((filter: any) => {
+            const fieldName = fieldMapping[filter.field] || filter.field;
+            const fieldValue = (project as any)[fieldName];
+            const filterValue = filter.value;
+
+            // Check if filterValue is a date range object
+            const isDateRange = filterValue && typeof filterValue === 'object' && 'start' in filterValue && 'end' in filterValue;
+
+            // Handle date range filtering
+            if (isDateRange) {
+              const fieldDate = fieldValue ? new Date(fieldValue).getTime() : null;
+              if (!fieldDate) return false;
+
+              const startDate = new Date(filterValue.start).getTime();
+              const endDate = new Date(filterValue.end).getTime();
+
+              switch (filter.operator) {
+                case 'on':
+                case 'equals':
+                case 'is':
+                  return fieldDate >= startDate && fieldDate <= endDate;
+                case 'before':
+                  return fieldDate < startDate;
+                case 'after':
+                  return fieldDate > endDate;
+                case 'between':
+                  return fieldDate >= startDate && fieldDate <= endDate;
+                default:
+                  return true;
+              }
+            }
+
+            // Handle regular string filtering
+            const stringValue = filterValue?.trim ? filterValue.trim() : String(filterValue || '');
+
+            switch (filter.operator) {
+              case 'contains':
+                if (!stringValue) return true;
+                return String(fieldValue || '').toLowerCase().includes(stringValue.toLowerCase());
+              case 'equals':
+              case 'is':
+                if (!stringValue) return true;
+                return String(fieldValue || '').toLowerCase() === stringValue.toLowerCase();
+              case 'not_equals':
+              case 'is_not':
+                if (!stringValue) return true;
+                return String(fieldValue || '').toLowerCase() !== stringValue.toLowerCase();
+              case 'not_contains':
+                if (!stringValue) return true;
+                return !String(fieldValue || '').toLowerCase().includes(stringValue.toLowerCase());
+              case 'starts_with':
+                if (!stringValue) return true;
+                return String(fieldValue || '').toLowerCase().startsWith(stringValue.toLowerCase());
+              case 'ends_with':
+                if (!stringValue) return true;
+                return String(fieldValue || '').toLowerCase().endsWith(stringValue.toLowerCase());
+              case 'is_empty':
+                return !fieldValue || String(fieldValue).trim() === '';
+              case 'is_not_empty':
+                return fieldValue && String(fieldValue).trim() !== '';
+              default:
+                return true;
+            }
+          });
+        });
+      }
+
+      // Get IDs of filtered projects for use in other queries
+      const filteredProjectIds = new Set(filteredProjects.map(p => p.id));
+
+      // Calculate stats based on filtered projects
+      const activeProjectsCount = filteredProjects.filter(p => p.status === 'active').length;
+
+      // Get workflow instances assigned to filtered projects
+      const allProjectWorkflows = await Promise.all(
+        Array.from(filteredProjectIds).map(projectId => storage.getProjectWorkflows(projectId))
+      );
+      const workflowsCount = allProjectWorkflows.flat().length;
+
+      // Get completed forms this month (filtered by projects matching the search)
+      const allSubmissions = await storage.getFormSubmissions();
+      const now = new Date();
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const completedFormsThisMonth = allSubmissions.filter(s => 
+        s.submittedBy === userId &&
+        s.projectId && filteredProjectIds.has(s.projectId) &&
+        new Date(s.submittedAt) >= firstDayOfMonth
+      ).length;
+
+      // Get pending forms count (for filtered projects)
+      const allProjectForms = await Promise.all(
+        Array.from(filteredProjectIds).map(projectId => storage.getProjectForms(projectId))
+      );
+      const assignedForms = allProjectForms.flat().filter(pf => pf.assignedUserId === userId);
+      
+      const userSubmissions = allSubmissions.filter(s => s.submittedBy === userId);
+      const submittedSet = new Set(
+        userSubmissions
+          .filter(s => s.projectId !== null && s.formId !== null)
+          .map(s => `${s.projectId}:${s.formId}`)
+      );
+      
+      const pendingFormsCount = assignedForms.filter(
+        af => !submittedSet.has(`${af.projectId}:${af.formId}`)
+      ).length;
+
+      res.json({
+        activeProjectsCount,
+        workflowsCount,
+        completedFormsThisMonth,
+        pendingFormsCount,
+      });
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+      res.status(500).json({ error: "Failed to fetch dashboard stats" });
+    }
+  });
+
+  app.get("/api/dashboard/assigned-forms", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const assignedForms = await storage.getUserAssignedForms(userId);
+      res.json(assignedForms);
+    } catch (error) {
+      console.error('Error fetching assigned forms:', error);
+      res.status(500).json({ error: "Failed to fetch assigned forms" });
     }
   });
 

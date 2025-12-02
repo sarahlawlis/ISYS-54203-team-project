@@ -39,6 +39,8 @@ export const attributes = pgTable("attributes", {
   type: text("type").notNull(),
   description: text("description"),
   icon: text("icon").notNull(),
+  embedding: text("embedding"), // JSON string of embedding vector
+  embeddingUpdatedAt: text("embedding_updated_at"),
 });
 
 export const insertAttributeSchema = createInsertSchema(attributes).omit({
@@ -111,11 +113,13 @@ export const projectUsers = pgTable("project_users", {
   projectId: varchar("project_id").notNull(),
   userId: varchar("user_id").notNull(),
   assignedAt: text("assigned_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  lastAccessedAt: text("last_accessed_at"),
 });
 
 export const insertProjectUserSchema = createInsertSchema(projectUsers).omit({
   id: true,
   assignedAt: true,
+  lastAccessedAt: true,
 });
 
 export type InsertProjectUser = z.infer<typeof insertProjectUserSchema>;
