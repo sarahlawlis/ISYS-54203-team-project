@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { insertAttributeSchema, insertFormSchema, insertWorkflowSchema, insertProjectSchema, insertProjectUserSchema, insertProjectFormSchema, insertProjectWorkflowSchema, insertFormSubmissionSchema, insertUserSchema, loginUserSchema, insertSavedSearchSchema } from "@shared/schema";
 import { hashPassword, verifyPassword, sanitizeUser, isAdmin } from "./auth";
 import { requirePermission, requireRole, canModifyProject } from "./permissions";
-import { generateAttributeEmbedding, findSimilarAttributes, serializeEmbedding, isAIConfigured } from "./ai-service";
+import { generateAttributeEmbedding, findSimilarAttributes, serializeEmbedding, isAIConfigured, suggestFormAttributes } from "./ai-service";
 import "./types";
 
 // Middleware to check if user is authenticated and attach user to request
@@ -490,6 +490,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete form" });
+    }
+  });
+
+  // AI-powered form attribute suggestions
+  app.post("/api/forms/suggest-attributes", requireAuth, async (req, res) => {
+    try {
+      // Check if AI is configured
+      if (!isAIConfigured()) {
+        return res.json([]);
+      }
+
+      const { formType, currentAttributeIds } = req.body;
+
+      if (!formType) {
+        return res.status(400).json({ error: "Form type is required" });
+      }
+
+      // Get all attributes
+      const allAttributes = await storage.getAttributes();
+
+      // Generate suggestions using AI
+      const suggestedAttributeIds = await suggestFormAttributes(
+        formType,
+        currentAttributeIds || [],
+        allAttributes
+      );
+
+      // Return full attribute objects (not just IDs)
+      const suggestions = suggestedAttributeIds
+        .map(id => allAttributes.find(a => a.id === id))
+        .filter((attr): attr is typeof allAttributes[0] => attr !== undefined);
+
+      res.json(suggestions);
+    } catch (error) {
+      console.error("Error generating form suggestions:", error);
+      // Return empty array on error for graceful degradation
+      res.json([]);
     }
   });
 

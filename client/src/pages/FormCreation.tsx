@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import type { DragEvent } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { CreateAttributeDialog } from "@/components/CreateAttributeDialog";
+import { AttributeSuggestions } from "@/components/AttributeSuggestions";
 import type { Attribute as DBAttribute } from "@shared/schema";
 
 interface Attribute {
@@ -72,6 +74,7 @@ const getIconComponent = (iconName: string) => {
 export default function FormCreation() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [formName, setFormName] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formAttributes, setFormAttributes] = useState<FormAttribute[]>([]);
@@ -79,6 +82,11 @@ export default function FormCreation() {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [attributeSearch, setAttributeSearch] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+
+  // AI Suggestions state
+  const [aiSuggestions, setAiSuggestions] = useState<Attribute[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [formType] = useState("project"); // Track form type
 
   // Fetch custom attributes from database
   const { data: customAttributes = [] } = useQuery<DBAttribute[]>({
@@ -95,6 +103,77 @@ export default function FormCreation() {
       description: attr.description,
     }));
   }, [customAttributes]);
+
+  // AI Suggestions: Fetch attribute suggestions
+  const fetchSuggestions = useCallback(async () => {
+    setIsLoadingSuggestions(true);
+
+    try {
+      const response = await fetch("/api/forms/suggest-attributes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          formType: formType,
+          currentAttributeIds: formAttributes.map(attr => attr.id),
+        }),
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        const suggestions = await response.json();
+        const suggestionsWithIcons = suggestions.map((attr: any) => ({
+          ...attr,
+          icon: getIconComponent(attr.icon),
+        }));
+        setAiSuggestions(suggestionsWithIcons);
+      } else {
+        setAiSuggestions([]);
+      }
+    } catch (error) {
+      console.error("Error fetching suggestions:", error);
+      setAiSuggestions([]);
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  }, [formType, formAttributes]);
+
+  // AI Suggestions: Handle adding suggested attribute
+  const handleAddSuggestedAttribute = useCallback((attribute: Attribute) => {
+    // Check if already added
+    if (formAttributes.some(attr => attr.id === attribute.id)) {
+      toast({
+        title: "Already Added",
+        description: `${attribute.name} is already in your form`,
+        variant: "default",
+      });
+      return;
+    }
+
+    // Add to form
+    const newFormAttribute: FormAttribute = {
+      ...attribute,
+      formId: `form-${Date.now()}`,
+      visibility: 'Editable',
+    };
+    setFormAttributes([...formAttributes, newFormAttribute]);
+
+    // Remove from suggestions
+    setAiSuggestions(aiSuggestions.filter(attr => attr.id !== attribute.id));
+
+    toast({
+      title: "Attribute Added",
+      description: `${attribute.name} added to your form`,
+    });
+  }, [formAttributes, aiSuggestions, toast]);
+
+  // AI Suggestions: Fetch on mount and when attributes change
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      fetchSuggestions();
+    }, formAttributes.length === 0 ? 300 : 1000); // Shorter delay on mount, longer on changes
+
+    return () => clearTimeout(timeoutId);
+  }, [fetchSuggestions, formAttributes.length]);
 
   // Load form data when editing existing form
   useEffect(() => {
@@ -530,9 +609,17 @@ export default function FormCreation() {
       </div>
 
       {/* Create Attribute Dialog */}
-      <CreateAttributeDialog 
-        open={isCreateDialogOpen} 
-        onOpenChange={setIsCreateDialogOpen} 
+      <CreateAttributeDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+      />
+
+      {/* Fixed position floating AI suggestions panel */}
+      <AttributeSuggestions
+        suggestions={aiSuggestions}
+        isLoading={isLoadingSuggestions}
+        onAddAttribute={handleAddSuggestedAttribute}
+        onRefresh={fetchSuggestions}
       />
     </div>
   );

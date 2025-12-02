@@ -130,6 +130,90 @@ export function deserializeEmbedding(embeddingJson: string): number[] {
 }
 
 /**
+ * Generate AI-powered attribute suggestions for form building
+ * Uses Gemini text generation to recommend relevant attributes
+ * @param formType - Type of form being built (e.g., 'project', 'task')
+ * @param currentAttributeIds - IDs of attributes already added to the form
+ * @param allAttributes - Complete list of available attributes
+ * @returns Array of suggested attribute IDs
+ */
+export async function suggestFormAttributes(
+  formType: string,
+  currentAttributeIds: string[],
+  allAttributes: Attribute[]
+): Promise<string[]> {
+  try {
+    // Build context for AI
+    const currentAttributes = allAttributes.filter(a => currentAttributeIds.includes(a.id));
+    const availableAttributes = allAttributes.filter(a => !currentAttributeIds.includes(a.id));
+
+    // If no attributes available to suggest, return empty array
+    if (availableAttributes.length === 0) {
+      return [];
+    }
+
+    // Construct prompt for Gemini
+    const currentAttrsText = currentAttributes.length > 0
+      ? currentAttributes.map(a => `- ${a.name} (${a.type}): ${a.description || 'No description'}`).join('\n')
+      : '(None yet)';
+
+    const availableAttrsText = availableAttributes
+      .map(a => `- ${a.name} (${a.type}): ${a.description || 'No description'}`)
+      .join('\n');
+
+    const prompt = `You are helping a user build a form for a ${formType} management system.
+
+Current form attributes:
+${currentAttrsText}
+
+Available attributes to suggest from:
+${availableAttrsText}
+
+Task: Suggest 3-5 attributes from the available list that would be most useful for this ${formType} form, considering:
+1. Essential fields typically needed for ${formType} management
+2. Attributes that complement what's already added
+3. Common industry practices for ${formType} forms
+
+Return ONLY the attribute names, one per line, no explanations or numbering.`;
+
+    // Call Gemini API
+    const result = await genAI.models.generateContent({
+      model: 'gemini-2.0-flash-exp',
+      contents: { parts: [{ text: prompt }] }
+    });
+
+    if (!result.text) {
+      throw new Error('No suggestions generated');
+    }
+
+    // Parse response - extract attribute names
+    const suggestedNames = result.text
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0 && !line.startsWith('-') && !line.match(/^\d+\./))
+      .slice(0, 5); // Max 5 suggestions
+
+    // Map back to attribute IDs
+    const suggestedIds = suggestedNames
+      .map(name => {
+        const attr = availableAttributes.find(a =>
+          a.name.toLowerCase() === name.toLowerCase() ||
+          a.name.toLowerCase().includes(name.toLowerCase()) ||
+          name.toLowerCase().includes(a.name.toLowerCase())
+        );
+        return attr?.id;
+      })
+      .filter((id): id is string => id !== undefined);
+
+    return suggestedIds;
+  } catch (error) {
+    console.error('Error generating attribute suggestions:', error);
+    // Return empty array on error for graceful degradation
+    return [];
+  }
+}
+
+/**
  * Check if Gemini API is configured
  */
 export function isAIConfigured(): boolean {
