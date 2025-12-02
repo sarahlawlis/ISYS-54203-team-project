@@ -178,7 +178,7 @@ Return ONLY the attribute names, one per line, no explanations or numbering.`;
 
     // Call Gemini API
     const result = await genAI.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-pro',
       contents: { parts: [{ text: prompt }] }
     });
 
