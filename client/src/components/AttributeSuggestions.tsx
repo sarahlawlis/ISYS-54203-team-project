@@ -23,20 +23,24 @@ export function AttributeSuggestions({
   // Track if we've completed at least one load attempt
   useEffect(() => {
     if (!isLoading && !hasLoadedOnce) {
+      console.log('[AttributeSuggestions] First load completed');
       setHasLoadedOnce(true);
     }
   }, [isLoading, hasLoadedOnce]);
 
   // Don't render if explicitly hidden
   if (isHidden) {
+    console.log('[AttributeSuggestions] Hidden by user');
     return null;
   }
 
   // Show component if loading or has suggestions, or if we haven't loaded once yet
   const shouldShow = isLoading || suggestions.length > 0 || !hasLoadedOnce;
+  console.log('[AttributeSuggestions] Render check:', { isLoading, suggestionsCount: suggestions.length, hasLoadedOnce, shouldShow });
 
   // Don't show if we should hide
   if (!shouldShow) {
+    console.log('[AttributeSuggestions] Not showing - shouldShow is false');
     return null;
   }
 

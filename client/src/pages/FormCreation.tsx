@@ -106,6 +106,7 @@ export default function FormCreation() {
 
   // AI Suggestions: Fetch attribute suggestions
   const fetchSuggestions = useCallback(async () => {
+    console.log('[AI Suggestions] Fetching suggestions...');
     setIsLoadingSuggestions(true);
 
     try {
@@ -119,18 +120,22 @@ export default function FormCreation() {
         credentials: "include",
       });
 
+      console.log('[AI Suggestions] Response status:', response.status);
+
       if (response.ok) {
         const suggestions = await response.json();
+        console.log('[AI Suggestions] Received suggestions:', suggestions.length);
         const suggestionsWithIcons = suggestions.map((attr: any) => ({
           ...attr,
           icon: getIconComponent(attr.icon),
         }));
         setAiSuggestions(suggestionsWithIcons);
       } else {
+        console.log('[AI Suggestions] Response not OK, clearing suggestions');
         setAiSuggestions([]);
       }
     } catch (error) {
-      console.error("Error fetching suggestions:", error);
+      console.error("[AI Suggestions] Error fetching suggestions:", error);
       setAiSuggestions([]);
     } finally {
       setIsLoadingSuggestions(false);
