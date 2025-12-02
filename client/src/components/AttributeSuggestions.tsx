@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Sparkles, ChevronDown, ChevronUp, RefreshCw, X } from "lucide-react";
+import { Sparkles, ChevronDown, RefreshCw, X } from "lucide-react";
 import type { Attribute } from "@shared/schema";
 
 interface AttributeSuggestionsProps {
@@ -18,9 +18,25 @@ export function AttributeSuggestions({
 }: AttributeSuggestionsProps) {
   const [isMinimized, setIsMinimized] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
-  // Don't render if hidden or if no AI suggestions available and not loading
-  if (isHidden || (!isLoading && suggestions.length === 0)) {
+  // Track if we've completed at least one load attempt
+  useEffect(() => {
+    if (!isLoading && !hasLoadedOnce) {
+      setHasLoadedOnce(true);
+    }
+  }, [isLoading, hasLoadedOnce]);
+
+  // Don't render if explicitly hidden
+  if (isHidden) {
+    return null;
+  }
+
+  // Show component if loading or has suggestions, or if we haven't loaded once yet
+  const shouldShow = isLoading || suggestions.length > 0 || !hasLoadedOnce;
+
+  // Don't show if we should hide
+  if (!shouldShow) {
     return null;
   }
 
@@ -87,6 +103,13 @@ export function AttributeSuggestions({
             <RefreshCw className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400 mb-3" />
             <span className="text-sm text-muted-foreground">
               Generating suggestions...
+            </span>
+          </div>
+        ) : suggestions.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8">
+            <Sparkles className="h-8 w-8 text-muted-foreground mb-3" />
+            <span className="text-sm text-muted-foreground text-center">
+              No suggestions available at the moment
             </span>
           </div>
         ) : (
