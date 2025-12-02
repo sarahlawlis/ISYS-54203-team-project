@@ -26,7 +26,7 @@ import { useState } from "react";
 export interface SavedSearchCardProps {
   id: string;
   name: string;
-  description?: string;
+  description?: string | null;
   visibility?: string;
   filters: string;
   resultCount: number;

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://raw.githubusercontent.com/streetsidesoftware/cspell/main/cspell.schema.json",
+  "version": "0.2",
+  "language": "en",
+  "ignorePaths": [
+    "node_modules",
+    "dist",
+    "coverage",
+    ".git",
+    ".github",
+    "package-lock.json",
+    "client/dist",
+    "attached_assets"
+  ],
+  "words": [
+    "cartographer",
+    "cmdk",
+    "drizzle",
+    "lucide",
+    "neondatabase",
+    "openid",
+    "radix",
+    "Replit",
+    "tanstack",
+    "tailwind",
+    "tailwindcss",
+    "tsbuildinfo",
+    "tsconfig",
+    "tsx",
+    "vaul",
+    "vitejs",
+    "wouter",
+    "zod",
+    "commanditem",
+    "Embla",
+    "nums",
+    "unstub",
+    "genai",
+    "twburns",
+    "firewalled"
+  ]
+}
