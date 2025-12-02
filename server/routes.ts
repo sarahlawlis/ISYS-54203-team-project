@@ -497,11 +497,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/forms/suggest-attributes", requireAuth, async (req, res) => {
     try {
       // Check if AI is configured
-      if (!isAIConfigured()) {
+      const aiConfigured = isAIConfigured();
+      console.log('[AI Suggestions] API key configured:', aiConfigured);
+
+      if (!aiConfigured) {
+        console.log('[AI Suggestions] No API key - returning empty array');
         return res.json([]);
       }
 
       const { formType, currentAttributeIds } = req.body;
+      console.log('[AI Suggestions] Request:', { formType, currentAttributeCount: currentAttributeIds?.length || 0 });
 
       if (!formType) {
         return res.status(400).json({ error: "Form type is required" });
@@ -509,6 +514,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get all attributes
       const allAttributes = await storage.getAttributes();
+      console.log('[AI Suggestions] Total attributes in DB:', allAttributes.length);
 
       // Generate suggestions using AI
       const suggestedAttributeIds = await suggestFormAttributes(
@@ -517,14 +523,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         allAttributes
       );
 
+      console.log('[AI Suggestions] Suggested attribute IDs:', suggestedAttributeIds.length);
+
       // Return full attribute objects (not just IDs)
       const suggestions = suggestedAttributeIds
         .map(id => allAttributes.find(a => a.id === id))
         .filter((attr): attr is typeof allAttributes[0] => attr !== undefined);
 
+      console.log('[AI Suggestions] Returning suggestions:', suggestions.length);
       res.json(suggestions);
     } catch (error) {
-      console.error("Error generating form suggestions:", error);
+      console.error("[AI Suggestions] Error generating form suggestions:", error);
       // Return empty array on error for graceful degradation
       res.json([]);
     }
