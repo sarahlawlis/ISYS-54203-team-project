@@ -10,6 +10,7 @@
     "check": "tsc",
     "test": "vitest run",
     "spellcheck": "cspell lint \"client/src/**/*.{ts,tsx}\" \"server/**/*.{ts,js}\" \"shared/**/*.{ts}\"",
+    "security-check": "npm audit --audit-level=high --production",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {

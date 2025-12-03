@@ -32,3 +32,6 @@ jobs:
 
       - name: Spell check (unique action)
         run: npm run spellcheck
+
+      - name: Security vulnerability check
+        run: npm run security-check
