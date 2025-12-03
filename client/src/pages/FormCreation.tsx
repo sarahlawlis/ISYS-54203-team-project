@@ -47,7 +47,9 @@ interface Attribute {
   name: string;
   type: string;
   icon: any;
-  description?: string | null;
+  description: string | null;
+  embedding: string | null;
+  embeddingUpdatedAt: string | null;
 }
 
 interface FormAttribute extends Attribute {
@@ -101,6 +103,8 @@ export default function FormCreation() {
       type: attr.type,
       icon: getIconComponent(attr.icon),
       description: attr.description,
+      embedding: attr.embedding,
+      embeddingUpdatedAt: attr.embeddingUpdatedAt,
     }));
   }, [customAttributes]);
 
