@@ -171,14 +171,15 @@ export default function FormCreation() {
     });
   }, [formAttributes, aiSuggestions, toast]);
 
-  // AI Suggestions: Fetch on mount and when attributes change
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      fetchSuggestions();
-    }, formAttributes.length === 0 ? 300 : 1000); // Shorter delay on mount, longer on changes
-
-    return () => clearTimeout(timeoutId);
-  }, [fetchSuggestions, formAttributes.length]);
+  // AI Suggestions: Disabled auto-fetch to prevent rate limiting
+  // User can manually refresh using the refresh button
+  // TODO: Re-enable after API quota resets or with paid tier
+  // useEffect(() => {
+  //   const timeoutId = setTimeout(() => {
+  //     fetchSuggestions();
+  //   }, formAttributes.length === 0 ? 300 : 1000);
+  //   return () => clearTimeout(timeoutId);
+  // }, [fetchSuggestions, formAttributes.length]);
 
   // Load form data when editing existing form
   useEffect(() => {
