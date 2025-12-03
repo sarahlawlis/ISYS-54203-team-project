@@ -47,7 +47,7 @@ interface Attribute {
   name: string;
   type: string;
   icon: any;
-  description?: string;
+  description?: string | null;
 }
 
 interface FormAttribute extends Attribute {

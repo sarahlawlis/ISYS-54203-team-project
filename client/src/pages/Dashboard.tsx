@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { Project, SavedSearch } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
+import { Link } from "wouter";
 import {
   Select,
   SelectContent,
@@ -166,9 +167,11 @@ export default function Dashboard() {
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">Recent Projects</h2>
-              <Button variant="outline" size="sm" data-testid="button-view-all-projects">
-                View All
-              </Button>
+              <Link href="/projects">
+                <Button variant="outline" size="sm" data-testid="button-view-all-projects">
+                  View All
+                </Button>
+              </Link>
             </div>
             {projectsLoading ? (
               <div className="grid gap-4">

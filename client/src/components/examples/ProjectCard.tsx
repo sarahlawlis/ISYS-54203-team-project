@@ -9,7 +9,6 @@ export default function ProjectCardExample() {
         description="Streamline new customer intake with automated workflows and documentation"
         status="active"
         dueDate="Dec 15, 2024"
-        teamSize={5}
         activeWorkflows={3}
       />
     </div>
