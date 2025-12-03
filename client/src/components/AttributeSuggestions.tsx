@@ -1,13 +1,22 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Sparkles, ChevronDown, RefreshCw, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Sparkles, ChevronDown, X, Send, User, Bot, RefreshCw } from "lucide-react";
 import type { Attribute } from "@shared/schema";
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  suggestedAttributes?: Attribute[];
+  timestamp: Date;
+}
 
 interface AttributeSuggestionsProps {
   suggestions: Attribute[];
   isLoading: boolean;
   onAddAttribute: (attribute: Attribute) => void;
   onRefresh: () => void;
+  onSendMessage: (message: string) => Promise<{ response: string; attributes?: Attribute[] }>;
 }
 
 export function AttributeSuggestions({
@@ -15,70 +24,95 @@ export function AttributeSuggestions({
   isLoading,
   onAddAttribute,
   onRefresh,
+  onSendMessage,
 }: AttributeSuggestionsProps) {
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(true); // Start minimized by default
   const [isHidden, setIsHidden] = useState(false);
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [inputValue, setInputValue] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Track if we've completed at least one load attempt
+  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    if (!isLoading && !hasLoadedOnce) {
-      console.log('[AttributeSuggestions] First load completed');
-      setHasLoadedOnce(true);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Handle sending a chat message
+  const handleSendMessage = async () => {
+    if (!inputValue.trim() || isSending) return;
+
+    const userMessage: ChatMessage = {
+      role: "user",
+      content: inputValue,
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInputValue("");
+    setIsSending(true);
+
+    try {
+      const { response, attributes } = await onSendMessage(inputValue);
+
+      const assistantMessage: ChatMessage = {
+        role: "assistant",
+        content: response,
+        suggestedAttributes: attributes,
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      const errorMessage: ChatMessage = {
+        role: "assistant",
+        content: "Sorry, I encountered an error. Please try again.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsSending(false);
     }
-  }, [isLoading, hasLoadedOnce]);
+  };
 
-  // Don't render if explicitly hidden
+  // Only hide if user explicitly closed it
   if (isHidden) {
-    console.log('[AttributeSuggestions] Hidden by user');
     return null;
   }
 
-  // Show component if loading or has suggestions, or if we haven't loaded once yet
-  const shouldShow = isLoading || suggestions.length > 0 || !hasLoadedOnce;
-  console.log('[AttributeSuggestions] Render check:', { isLoading, suggestionsCount: suggestions.length, hasLoadedOnce, shouldShow });
-
-  // Don't show if we should hide
-  if (!shouldShow) {
-    console.log('[AttributeSuggestions] Not showing - shouldShow is false');
-    return null;
-  }
-
-  // Minimized view - compact pill
+  // Minimized view - chatbot-style pill (always visible)
   if (isMinimized) {
     return (
       <div className="fixed bottom-4 right-4 z-50">
         <button
           onClick={() => setIsMinimized(false)}
-          className="flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 px-4 py-3 text-white shadow-2xl hover:shadow-blue-500/50 transition-all hover:scale-105"
+          className="flex items-center gap-3 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 px-5 py-3 text-white shadow-2xl hover:shadow-blue-500/50 transition-all hover:scale-105"
         >
           <Sparkles className="h-5 w-5" />
-          <span className="font-semibold">AI Suggestions</span>
-          {suggestions.length > 0 && (
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-xs font-bold">
-              {suggestions.length}
-            </span>
-          )}
+          <div className="flex flex-col items-start">
+            <span className="font-semibold text-sm">Form Assistant</span>
+            {suggestions.length > 0 ? (
+              <span className="text-xs opacity-90">{suggestions.length} suggestions ready</span>
+            ) : (
+              <span className="text-xs opacity-90">Click to chat</span>
+            )}
+          </div>
         </button>
       </div>
     );
   }
 
-  // Expanded view - full panel
+  // Expanded view - chat interface
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-80 max-h-96 flex flex-col rounded-lg bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/40 dark:to-purple-950/40 shadow-2xl border border-blue-200 dark:border-blue-800">
+    <div className="fixed bottom-4 right-4 z-50 w-96 h-[600px] flex flex-col rounded-lg bg-white dark:bg-gray-950 shadow-2xl border border-blue-200 dark:border-blue-800">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-blue-200 dark:border-blue-800">
+      <div className="flex items-center justify-between p-4 border-b border-blue-200 dark:border-blue-800 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/40 dark:to-purple-950/40">
         <div className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           <span className="font-semibold text-blue-900 dark:text-blue-100">
-            AI Suggestions
+            Form Assistant
           </span>
-          {suggestions.length > 0 && (
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 dark:bg-blue-500 text-xs font-bold text-white">
-              {suggestions.length}
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-1">
           <Button
@@ -100,77 +134,127 @@ export function AttributeSuggestions({
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-8">
-            <RefreshCw className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400 mb-3" />
-            <span className="text-sm text-muted-foreground">
-              Generating suggestions...
-            </span>
-          </div>
-        ) : suggestions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8">
-            <Sparkles className="h-8 w-8 text-muted-foreground mb-3" />
-            <span className="text-sm text-muted-foreground text-center">
-              No suggestions available at the moment
-            </span>
+      {/* Chat Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center px-4">
+            <Sparkles className="h-12 w-12 text-blue-500 mb-4" />
+            <h3 className="font-semibold text-lg mb-2">Welcome to Form Assistant!</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              I can help you build your form by suggesting relevant attributes. Try asking me:
+            </p>
+            <div className="space-y-2 text-xs text-left w-full">
+              <div className="p-2 bg-blue-50 dark:bg-blue-950/30 rounded border border-blue-200 dark:border-blue-800">
+                "What fields do I need for a project form?"
+              </div>
+              <div className="p-2 bg-blue-50 dark:bg-blue-950/30 rounded border border-blue-200 dark:border-blue-800">
+                "Suggest attributes for tracking tasks"
+              </div>
+              <div className="p-2 bg-blue-50 dark:bg-blue-950/30 rounded border border-blue-200 dark:border-blue-800">
+                "I need fields for contact information"
+              </div>
+            </div>
           </div>
         ) : (
           <>
-            <p className="text-xs text-muted-foreground mb-3">
-              AI-recommended attributes for your form
-            </p>
-            <div className="space-y-2">
-              {suggestions.map((attr) => {
-                const Icon = attr.icon as any;
-                return (
-                  <div
-                    key={attr.id}
-                    className="flex items-center justify-between p-3 rounded-lg border border-blue-200 bg-white dark:bg-gray-900 dark:border-blue-800 hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <div className="flex h-8 w-8 items-center justify-center rounded bg-blue-100 dark:bg-blue-900/50 flex-shrink-0">
-                        <Icon className="h-4 w-4 text-blue-700 dark:text-blue-300" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate text-gray-900 dark:text-gray-100">
-                          {attr.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground capitalize">
-                          {attr.type}
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => onAddAttribute(attr)}
-                      className="ml-2 h-8 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      Add
-                    </Button>
+            {messages.map((message, index) => (
+              <div
+                key={index}
+                className={`flex gap-3 ${
+                  message.role === "user" ? "justify-end" : "justify-start"
+                }`}
+              >
+                {message.role === "assistant" && (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-white flex-shrink-0">
+                    <Bot className="h-5 w-5" />
                   </div>
-                );
-              })}
-            </div>
+                )}
+                <div className={`flex flex-col max-w-[75%] ${
+                  message.role === "user" ? "items-end" : "items-start"
+                }`}>
+                  <div
+                    className={`rounded-lg px-4 py-2 ${
+                      message.role === "user"
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  </div>
+                  {message.suggestedAttributes && message.suggestedAttributes.length > 0 && (
+                    <div className="mt-2 space-y-2 w-full">
+                      {message.suggestedAttributes.map((attr) => {
+                        const Icon = attr.icon as any;
+                        return (
+                          <div
+                            key={attr.id}
+                            className="flex items-center justify-between p-2 rounded-lg border border-blue-200 bg-white dark:bg-gray-900 dark:border-blue-800 hover:shadow-md transition-shadow"
+                          >
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <div className="flex h-6 w-6 items-center justify-center rounded bg-blue-100 dark:bg-blue-900/50 flex-shrink-0">
+                                <Icon className="h-3 w-3 text-blue-700 dark:text-blue-300" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium truncate text-gray-900 dark:text-gray-100">
+                                  {attr.name}
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              onClick={() => onAddAttribute(attr)}
+                              className="ml-2 h-6 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                              Add
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                {message.role === "user" && (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-300 dark:bg-gray-700 flex-shrink-0">
+                    <User className="h-5 w-5" />
+                  </div>
+                )}
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
           </>
         )}
       </div>
 
-      {/* Footer */}
-      {!isLoading && suggestions.length > 0 && (
-        <div className="p-3 border-t border-blue-200 dark:border-blue-800">
+      {/* Input Area */}
+      <div className="p-4 border-t border-blue-200 dark:border-blue-800 bg-gray-50 dark:bg-gray-900/50">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSendMessage();
+          }}
+          className="flex gap-2"
+        >
+          <Input
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder="Ask me about form attributes..."
+            disabled={isSending}
+            className="flex-1"
+          />
           <Button
-            variant="ghost"
+            type="submit"
+            disabled={!inputValue.trim() || isSending}
             size="sm"
-            onClick={onRefresh}
-            className="w-full text-xs text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+            className="bg-blue-600 hover:bg-blue-700 text-white"
           >
-            <RefreshCw className="h-3 w-3 mr-1" />
-            Refresh Suggestions
+            {isSending ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
           </Button>
-        </div>
-      )}
+        </form>
+      </div>
     </div>
   );
 }

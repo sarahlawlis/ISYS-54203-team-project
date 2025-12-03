@@ -171,6 +171,45 @@ export default function FormCreation() {
     });
   }, [formAttributes, aiSuggestions, toast]);
 
+  // AI Chat: Handle chat messages
+  const handleSendChatMessage = useCallback(async (message: string): Promise<{ response: string; attributes?: Attribute[] }> => {
+    try {
+      const response = await fetch("/api/forms/chat-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message,
+          formType: formType,
+          currentAttributeIds: formAttributes.map(attr => attr.id),
+        }),
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+
+        // Convert attributes to include icons
+        const attributesWithIcons = data.attributes?.map((attr: any) => ({
+          ...attr,
+          icon: getIconComponent(attr.icon),
+        })) || [];
+
+        return {
+          response: data.response,
+          attributes: attributesWithIcons,
+        };
+      } else {
+        throw new Error("Failed to get response");
+      }
+    } catch (error) {
+      console.error("[AI Chat] Error sending message:", error);
+      return {
+        response: "Sorry, I'm having trouble connecting right now. Please try again.",
+        attributes: [],
+      };
+    }
+  }, [formType, formAttributes]);
+
   // AI Suggestions: Disabled auto-fetch to prevent rate limiting
   // User can manually refresh using the refresh button
   // TODO: Re-enable after API quota resets or with paid tier
@@ -620,12 +659,13 @@ export default function FormCreation() {
         onOpenChange={setIsCreateDialogOpen}
       />
 
-      {/* Fixed position floating AI suggestions panel */}
+      {/* Fixed position floating AI chat assistant */}
       <AttributeSuggestions
         suggestions={aiSuggestions}
         isLoading={isLoadingSuggestions}
         onAddAttribute={handleAddSuggestedAttribute}
         onRefresh={fetchSuggestions}
+        onSendMessage={handleSendChatMessage}
       />
     </div>
   );

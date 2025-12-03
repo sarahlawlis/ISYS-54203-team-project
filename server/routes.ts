@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { insertAttributeSchema, insertFormSchema, insertWorkflowSchema, insertProjectSchema, insertProjectUserSchema, insertProjectFormSchema, insertProjectWorkflowSchema, insertFormSubmissionSchema, insertUserSchema, loginUserSchema, insertSavedSearchSchema } from "@shared/schema";
 import { hashPassword, verifyPassword, sanitizeUser, isAdmin } from "./auth";
 import { requirePermission, requireRole, canModifyProject } from "./permissions";
-import { generateAttributeEmbedding, findSimilarAttributes, serializeEmbedding, isAIConfigured, suggestFormAttributes } from "./ai-service";
+import { generateAttributeEmbedding, findSimilarAttributes, serializeEmbedding, isAIConfigured, suggestFormAttributes, chatFormAssistant } from "./ai-service";
 import "./types";
 
 // Middleware to check if user is authenticated and attach user to request
@@ -536,6 +536,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("[AI Suggestions] Error generating form suggestions:", error);
       // Return empty array on error for graceful degradation
       res.json([]);
+    }
+  });
+
+  // AI chat assistant for form building
+  app.post("/api/forms/chat-assistant", requireAuth, async (req, res) => {
+    try {
+      // Check if AI is configured
+      if (!isAIConfigured()) {
+        return res.status(503).json({
+          error: "AI assistant is not configured",
+          response: "Sorry, the AI assistant is not available right now.",
+          attributes: []
+        });
+      }
+
+      const { message, formType, currentAttributeIds } = req.body;
+
+      if (!message || !formType) {
+        return res.status(400).json({ error: "Message and form type are required" });
+      }
+
+      // Get all attributes
+      const allAttributes = await storage.getAttributes();
+
+      // Chat with AI assistant
+      const { response, suggestedAttributeIds } = await chatFormAssistant(
+        message,
+        formType,
+        currentAttributeIds || [],
+        allAttributes
+      );
+
+      // Map suggested IDs to full attribute objects
+      const suggestedAttributes = suggestedAttributeIds
+        .map(id => allAttributes.find(a => a.id === id))
+        .filter((attr): attr is typeof allAttributes[0] => attr !== undefined);
+
+      res.json({
+        response,
+        attributes: suggestedAttributes
+      });
+    } catch (error) {
+      console.error("[AI Chat] Error in chat assistant:", error);
+      res.status(500).json({
+        error: "Failed to process chat message",
+        response: "Sorry, I encountered an error. Please try again.",
+        attributes: []
+      });
     }
   });
 
