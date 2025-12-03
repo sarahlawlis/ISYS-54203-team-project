@@ -130,6 +130,196 @@ export function deserializeEmbedding(embeddingJson: string): number[] {
 }
 
 /**
+ * Generate AI-powered attribute suggestions for form building
+ * Uses Gemini text generation to recommend relevant attributes
+ * @param formType - Type of form being built (e.g., 'project', 'task')
+ * @param currentAttributeIds - IDs of attributes already added to the form
+ * @param allAttributes - Complete list of available attributes
+ * @returns Array of suggested attribute IDs
+ */
+export async function suggestFormAttributes(
+  formType: string,
+  currentAttributeIds: string[],
+  allAttributes: Attribute[]
+): Promise<string[]> {
+  try {
+    // Build context for AI
+    const currentAttributes = allAttributes.filter(a => currentAttributeIds.includes(a.id));
+    const availableAttributes = allAttributes.filter(a => !currentAttributeIds.includes(a.id));
+
+    // If no attributes available to suggest, return empty array
+    if (availableAttributes.length === 0) {
+      return [];
+    }
+
+    // Construct prompt for Gemini
+    const currentAttrsText = currentAttributes.length > 0
+      ? currentAttributes.map(a => `- ${a.name} (${a.type}): ${a.description || 'No description'}`).join('\n')
+      : '(None yet)';
+
+    const availableAttrsText = availableAttributes
+      .map(a => `- ${a.name} (${a.type}): ${a.description || 'No description'}`)
+      .join('\n');
+
+    const prompt = `You are helping a user build a form for a ${formType} management system.
+
+Current form attributes:
+${currentAttrsText}
+
+Available attributes to suggest from:
+${availableAttrsText}
+
+Task: Suggest 3-5 attributes from the available list that would be most useful for this ${formType} form, considering:
+1. Essential fields typically needed for ${formType} management
+2. Attributes that complement what's already added
+3. Common industry practices for ${formType} forms
+
+Return ONLY the attribute names, one per line, no explanations or numbering.`;
+
+    // Call Gemini API - using 2.0 flash experimental (only model available in v1beta for text generation)
+    // Note: Has strict rate limits (10 RPM, 1000 RPD) but is the only working option
+    const result = await genAI.models.generateContent({
+      model: 'gemini-2.0-flash-exp',
+      contents: { parts: [{ text: prompt }] }
+    });
+
+    if (!result.text) {
+      throw new Error('No suggestions generated');
+    }
+
+    // Parse response - extract attribute names
+    const suggestedNames = result.text
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0 && !line.startsWith('-') && !line.match(/^\d+\./))
+      .slice(0, 5); // Max 5 suggestions
+
+    // Map back to attribute IDs
+    const suggestedIds = suggestedNames
+      .map(name => {
+        const attr = availableAttributes.find(a =>
+          a.name.toLowerCase() === name.toLowerCase() ||
+          a.name.toLowerCase().includes(name.toLowerCase()) ||
+          name.toLowerCase().includes(a.name.toLowerCase())
+        );
+        return attr?.id;
+      })
+      .filter((id): id is string => id !== undefined);
+
+    return suggestedIds;
+  } catch (error) {
+    console.error('Error generating attribute suggestions:', error);
+    // Return empty array on error for graceful degradation
+    return [];
+  }
+}
+
+/**
+ * Chat with AI assistant about form building
+ * Generates conversational responses and can recommend specific attributes
+ * @param userMessage - The user's message/question
+ * @param formType - Type of form being built
+ * @param currentAttributeIds - IDs of attributes already added
+ * @param allAttributes - Complete list of available attributes
+ * @returns Response text and optional suggested attribute IDs
+ */
+export async function chatFormAssistant(
+  userMessage: string,
+  formType: string,
+  currentAttributeIds: string[],
+  allAttributes: Attribute[]
+): Promise<{ response: string; suggestedAttributeIds: string[] }> {
+  try {
+    // Build context for AI
+    const currentAttributes = allAttributes.filter(a => currentAttributeIds.includes(a.id));
+    const availableAttributes = allAttributes.filter(a => !currentAttributeIds.includes(a.id));
+
+    const currentAttrsText = currentAttributes.length > 0
+      ? currentAttributes.map(a => `- ${a.name} (${a.type}): ${a.description || 'No description'}`).join('\n')
+      : '(None yet)';
+
+    const availableAttrsText = availableAttributes
+      .map(a => `- ${a.name} (${a.type}): ${a.description || 'No description'}`)
+      .join('\n');
+
+    const prompt = `You are a helpful AI assistant for building forms in a project management system. You help users choose the right attributes for their forms.
+
+Context:
+- Form Type: ${formType}
+- Current Attributes:
+${currentAttrsText}
+
+Available Attributes to Suggest:
+${availableAttrsText}
+
+User Message: ${userMessage}
+
+Instructions:
+1. Provide a friendly, conversational response to the user's question or request
+2. If the user is asking for attribute suggestions, recommend 2-4 relevant attributes from the available list
+3. Explain WHY each suggested attribute would be useful for their ${formType} form
+4. If suggesting attributes, list them at the end in this exact format:
+
+SUGGESTED_ATTRIBUTES:
+- AttributeName1
+- AttributeName2
+
+Your response (be conversational and helpful):`;
+
+    // Call Gemini API
+    const result = await genAI.models.generateContent({
+      model: 'gemini-2.0-flash-exp',
+      contents: { parts: [{ text: prompt }] }
+    });
+
+    if (!result.text) {
+      throw new Error('No response generated');
+    }
+
+    // Parse response - extract main text and suggested attributes
+    const fullResponse = result.text;
+    const suggestedAttributesMatch = fullResponse.match(/SUGGESTED_ATTRIBUTES:\s*((?:- .+\n?)+)/);
+
+    let responseText = fullResponse;
+    let suggestedAttributeIds: string[] = [];
+
+    if (suggestedAttributesMatch) {
+      // Remove the SUGGESTED_ATTRIBUTES section from the main response
+      responseText = fullResponse.replace(/SUGGESTED_ATTRIBUTES:\s*(?:- .+\n?)+/, '').trim();
+
+      // Extract attribute names
+      const suggestedNames = suggestedAttributesMatch[1]
+        .split('\n')
+        .map(line => line.replace(/^-\s*/, '').trim())
+        .filter(line => line.length > 0);
+
+      // Map back to attribute IDs
+      suggestedAttributeIds = suggestedNames
+        .map(name => {
+          const attr = availableAttributes.find(a =>
+            a.name.toLowerCase() === name.toLowerCase() ||
+            a.name.toLowerCase().includes(name.toLowerCase()) ||
+            name.toLowerCase().includes(a.name.toLowerCase())
+          );
+          return attr?.id;
+        })
+        .filter((id): id is string => id !== undefined);
+    }
+
+    return {
+      response: responseText,
+      suggestedAttributeIds
+    };
+  } catch (error) {
+    console.error('Error in chat assistant:', error);
+    return {
+      response: "I'm having trouble connecting right now. Please try again in a moment.",
+      suggestedAttributeIds: []
+    };
+  }
+}
+
+/**
  * Check if Gemini API is configured
  */
 export function isAIConfigured(): boolean {
