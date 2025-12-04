@@ -11,7 +11,7 @@
     "test": "vitest run",
     "spellcheck": "cspell lint \"client/src/**/*.{ts,tsx}\" \"server/**/*.{ts,js}\" \"shared/**/*.{ts}\"",
     "security-check": "npm audit --audit-level=high --production",
-    "serve:dist": "http-server dist/public -p 8080 -s",
+    "serve:dist": "http-server dist/public -p 8080 -a 127.0.0.1 -s",
     "a11y": "vite build && start-server-and-test serve:dist http://localhost:8080 pa11y-ci",
     "db:push": "drizzle-kit push"
   },
