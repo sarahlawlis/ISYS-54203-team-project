@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import type { DragEvent } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { CreateAttributeDialog } from "@/components/CreateAttributeDialog";
+import { AttributeSuggestions } from "@/components/AttributeSuggestions";
 import type { Attribute as DBAttribute } from "@shared/schema";
 
 interface Attribute {
@@ -45,7 +47,9 @@ interface Attribute {
   name: string;
   type: string;
   icon: any;
-  description?: string | null;
+  description: string | null;
+  embedding: string | null;
+  embeddingUpdatedAt: string | null;
 }
 
 interface FormAttribute extends Attribute {
@@ -72,6 +76,7 @@ const getIconComponent = (iconName: string) => {
 export default function FormCreation() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [formName, setFormName] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formAttributes, setFormAttributes] = useState<FormAttribute[]>([]);
@@ -79,6 +84,11 @@ export default function FormCreation() {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [attributeSearch, setAttributeSearch] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+
+  // AI Suggestions state
+  const [aiSuggestions, setAiSuggestions] = useState<Attribute[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [formType] = useState("project"); // Track form type
 
   // Fetch custom attributes from database
   const { data: customAttributes = [] } = useQuery<DBAttribute[]>({
@@ -93,8 +103,126 @@ export default function FormCreation() {
       type: attr.type,
       icon: getIconComponent(attr.icon),
       description: attr.description,
+      embedding: attr.embedding,
+      embeddingUpdatedAt: attr.embeddingUpdatedAt,
     }));
   }, [customAttributes]);
+
+  // AI Suggestions: Fetch attribute suggestions
+  const fetchSuggestions = useCallback(async () => {
+    console.log('[AI Suggestions] Fetching suggestions...');
+    setIsLoadingSuggestions(true);
+
+    try {
+      const response = await fetch("/api/forms/suggest-attributes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          formType: formType,
+          currentAttributeIds: formAttributes.map(attr => attr.id),
+        }),
+        credentials: "include",
+      });
+
+      console.log('[AI Suggestions] Response status:', response.status);
+
+      if (response.ok) {
+        const suggestions = await response.json();
+        console.log('[AI Suggestions] Received suggestions:', suggestions.length);
+        const suggestionsWithIcons = suggestions.map((attr: any) => ({
+          ...attr,
+          icon: getIconComponent(attr.icon),
+        }));
+        setAiSuggestions(suggestionsWithIcons);
+      } else {
+        console.log('[AI Suggestions] Response not OK, clearing suggestions');
+        setAiSuggestions([]);
+      }
+    } catch (error) {
+      console.error("[AI Suggestions] Error fetching suggestions:", error);
+      setAiSuggestions([]);
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  }, [formType, formAttributes]);
+
+  // AI Suggestions: Handle adding suggested attribute
+  const handleAddSuggestedAttribute = useCallback((attribute: Attribute) => {
+    // Check if already added
+    if (formAttributes.some(attr => attr.id === attribute.id)) {
+      toast({
+        title: "Already Added",
+        description: `${attribute.name} is already in your form`,
+        variant: "default",
+      });
+      return;
+    }
+
+    // Add to form
+    const newFormAttribute: FormAttribute = {
+      ...attribute,
+      formId: `form-${Date.now()}`,
+      visibility: 'Editable',
+    };
+    setFormAttributes([...formAttributes, newFormAttribute]);
+
+    // Remove from suggestions
+    setAiSuggestions(aiSuggestions.filter(attr => attr.id !== attribute.id));
+
+    toast({
+      title: "Attribute Added",
+      description: `${attribute.name} added to your form`,
+    });
+  }, [formAttributes, aiSuggestions, toast]);
+
+  // AI Chat: Handle chat messages
+  const handleSendChatMessage = useCallback(async (message: string): Promise<{ response: string; attributes?: Attribute[] }> => {
+    try {
+      const response = await fetch("/api/forms/chat-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message,
+          formType: formType,
+          currentAttributeIds: formAttributes.map(attr => attr.id),
+        }),
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+
+        // Convert attributes to include icons
+        const attributesWithIcons = data.attributes?.map((attr: any) => ({
+          ...attr,
+          icon: getIconComponent(attr.icon),
+        })) || [];
+
+        return {
+          response: data.response,
+          attributes: attributesWithIcons,
+        };
+      } else {
+        throw new Error("Failed to get response");
+      }
+    } catch (error) {
+      console.error("[AI Chat] Error sending message:", error);
+      return {
+        response: "Sorry, I'm having trouble connecting right now. Please try again.",
+        attributes: [],
+      };
+    }
+  }, [formType, formAttributes]);
+
+  // AI Suggestions: Disabled auto-fetch to prevent rate limiting
+  // User can manually refresh using the refresh button
+  // TODO: Re-enable after API quota resets or with paid tier
+  // useEffect(() => {
+  //   const timeoutId = setTimeout(() => {
+  //     fetchSuggestions();
+  //   }, formAttributes.length === 0 ? 300 : 1000);
+  //   return () => clearTimeout(timeoutId);
+  // }, [fetchSuggestions, formAttributes.length]);
 
   // Load form data when editing existing form
   useEffect(() => {
@@ -530,9 +658,18 @@ export default function FormCreation() {
       </div>
 
       {/* Create Attribute Dialog */}
-      <CreateAttributeDialog 
-        open={isCreateDialogOpen} 
-        onOpenChange={setIsCreateDialogOpen} 
+      <CreateAttributeDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+      />
+
+      {/* Fixed position floating AI chat assistant */}
+      <AttributeSuggestions
+        suggestions={aiSuggestions}
+        isLoading={isLoadingSuggestions}
+        onAddAttribute={handleAddSuggestedAttribute}
+        onRefresh={fetchSuggestions}
+        onSendMessage={handleSendChatMessage}
       />
     </div>
   );
