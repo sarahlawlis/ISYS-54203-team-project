@@ -106,14 +106,18 @@ export default function Login() {
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button
+              type="submit"
+              className="w-full bg-[#007acb] text-white hover:bg-[#006aad]"
+              disabled={isLoading}
+            >
               {isLoading ? "Loading..." : isLogin ? "Login" : "Create Account"}
             </Button>
 
             <Button
               type="button"
-              variant="ghost"
-              className="w-full"
+              variant="outline"
+              className="w-full border-primary text-[#004675] hover:bg-primary/10"
               onClick={() => setIsLogin(!isLogin)}
             >
               {isLogin ? "Need an account? Sign up" : "Already have an account? Login"}

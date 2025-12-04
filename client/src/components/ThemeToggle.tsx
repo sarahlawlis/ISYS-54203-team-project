@@ -24,8 +24,15 @@ export function ThemeToggle() {
       variant="ghost"
       size="icon"
       onClick={toggleTheme}
+      aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+      aria-pressed={theme === "dark"}
+      title={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+      type="button"
       data-testid="button-theme-toggle"
     >
+      <span className="sr-only">
+        {theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+      </span>
       {theme === "light" ? (
         <Sun className="h-5 w-5" />
       ) : (
