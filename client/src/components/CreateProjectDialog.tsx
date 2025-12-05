@@ -50,7 +50,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Check, ChevronsUpDown, X } from "lucide-react";
 
-const createProjectFormSchema = insertProjectSchema.extend({
+const createProjectFormSchema = insertProjectSchema.omit({ ownerId: true }).extend({
   userIds: z.array(z.string()).optional(),
   formIds: z.array(z.string()).optional(),
   workflowIds: z.array(z.string()).optional(),
