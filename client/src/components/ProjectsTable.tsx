@@ -26,9 +26,12 @@ const statusColors = {
 
 interface ProjectsTableProps {
   projects: ProjectCardProps[];
+  onEdit?: (id: string) => void;
+  onArchive?: (id: string) => void;
+  onDelete?: (id: string) => void;
 }
 
-export function ProjectsTable({ projects }: ProjectsTableProps) {
+export function ProjectsTable({ projects, onEdit, onArchive, onDelete }: ProjectsTableProps) {
   return (
     <div className="border rounded-card overflow-hidden">
       <Table>
@@ -68,13 +71,13 @@ export function ProjectsTable({ projects }: ProjectsTableProps) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem data-testid={`button-edit-project-${project.id}`}>
+                    <DropdownMenuItem onClick={() => onEdit?.(project.id)} data-testid={`button-edit-project-${project.id}`}>
                       Edit
                     </DropdownMenuItem>
-                    <DropdownMenuItem data-testid={`button-archive-project-${project.id}`}>
+                    <DropdownMenuItem onClick={() => onArchive?.(project.id)} data-testid={`button-archive-project-${project.id}`}>
                       Archive
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive" data-testid={`button-delete-project-${project.id}`}>
+                    <DropdownMenuItem onClick={() => onDelete?.(project.id)} className="text-destructive" data-testid={`button-delete-project-${project.id}`}>
                       Delete
                     </DropdownMenuItem>
                   </DropdownMenuContent>

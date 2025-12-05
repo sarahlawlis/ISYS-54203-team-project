@@ -24,6 +24,9 @@ export interface ProjectCardProps {
   dueDate: string;
   assignedUsernames?: string[];
   activeWorkflows: number;
+  onEdit?: (id: string) => void;
+  onArchive?: (id: string) => void;
+  onDelete?: (id: string) => void;
 }
 
 const statusColors = {
@@ -41,10 +44,31 @@ export function ProjectCard({
   dueDate,
   assignedUsernames = [],
   activeWorkflows,
+  onEdit,
+  onArchive,
+  onDelete,
 }: ProjectCardProps) {
   const handleMenuClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
+  };
+
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onEdit?.(id);
+  };
+
+  const handleArchive = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onArchive?.(id);
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onDelete?.(id);
   };
 
   const userCount = assignedUsernames.length;
@@ -71,13 +95,13 @@ export function ProjectCard({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem data-testid={`button-edit-project-${id}`}>
+                <DropdownMenuItem onClick={handleEdit} data-testid={`button-edit-project-${id}`}>
                   Edit Project
                 </DropdownMenuItem>
-                <DropdownMenuItem data-testid={`button-archive-project-${id}`}>
+                <DropdownMenuItem onClick={handleArchive} data-testid={`button-archive-project-${id}`}>
                   Archive
                 </DropdownMenuItem>
-                <DropdownMenuItem className="text-destructive" data-testid={`button-delete-project-${id}`}>
+                <DropdownMenuItem onClick={handleDelete} className="text-destructive" data-testid={`button-delete-project-${id}`}>
                   Delete
                 </DropdownMenuItem>
               </DropdownMenuContent>

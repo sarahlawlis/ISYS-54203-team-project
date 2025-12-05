@@ -11,9 +11,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Plus, Search, Loader2 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { Project, User } from "@shared/schema";
 
 type ProjectWithUsers = Project & {
@@ -21,13 +33,68 @@ type ProjectWithUsers = Project & {
 };
 
 export default function Projects() {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [view, setView] = useState<ViewMode>("cards");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editProjectId, setEditProjectId] = useState<string | null>(null);
+  const [editProjectData, setEditProjectData] = useState<{
+    name: string;
+    description: string;
+    status: "planning" | "active" | "on-hold" | "completed";
+    dueDate: string;
+    userIds?: string[];
+    formIds?: string[];
+    workflowIds?: string[];
+  } | null>(null);
+  const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
+  const [deleteProjectName, setDeleteProjectName] = useState("");
 
   const { data: projects = [], isLoading: isLoadingProjects } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: async (projectId: string) => {
+      const res = await apiRequest("PUT", `/api/projects/${projectId}`, { status: "on-hold" });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      toast({
+        title: "Project archived",
+        description: "The project has been moved to On Hold status.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to archive project. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (projectId: string) => {
+      await apiRequest("DELETE", `/api/projects/${projectId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      setDeleteProjectId(null);
+      toast({
+        title: "Project deleted",
+        description: "The project has been permanently deleted.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete project. Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   const { data: projectUsersMap = {}, isLoading: isLoadingUsers } = useQuery<Record<string, string[]>>({
@@ -71,6 +138,66 @@ export default function Projects() {
     localStorage.setItem("projects-view", newView);
   };
 
+  const handleEditProject = async (projectId: string) => {
+    const project = projects.find(p => p.id === projectId);
+    if (project) {
+      try {
+        const [usersRes, formsRes, workflowsRes] = await Promise.all([
+          fetch(`/api/projects/${projectId}/users`),
+          fetch(`/api/projects/${projectId}/forms`),
+          fetch(`/api/projects/${projectId}/workflows`),
+        ]);
+        
+        if (!usersRes.ok || !formsRes.ok || !workflowsRes.ok) {
+          throw new Error("Failed to fetch project data");
+        }
+        
+        const usersData = await usersRes.json();
+        const formsData = await formsRes.json();
+        const workflowsData = await workflowsRes.json();
+        
+        const userIds = usersData.users?.map((u: User) => u.id) || [];
+        const formIds = formsData.map((f: { formId: string }) => f.formId) || [];
+        const workflowIds = workflowsData.map((w: { workflowId: string }) => w.workflowId) || [];
+        
+        setEditProjectId(projectId);
+        setEditProjectData({
+          name: project.name,
+          description: project.description || "",
+          status: project.status as "planning" | "active" | "on-hold" | "completed",
+          dueDate: project.dueDate || "",
+          userIds,
+          formIds,
+          workflowIds,
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to load project data. Please try again.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const handleArchiveProject = (projectId: string) => {
+    archiveMutation.mutate(projectId);
+  };
+
+  const handleDeleteProject = (projectId: string) => {
+    const project = projects.find(p => p.id === projectId);
+    if (project) {
+      setDeleteProjectId(projectId);
+      setDeleteProjectName(project.name);
+    }
+  };
+
+  const confirmDelete = () => {
+    if (deleteProjectId) {
+      deleteMutation.mutate(deleteProjectId);
+    }
+  };
+
   const filteredProjects = projectsWithUsers.filter((project) => {
     const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project.description?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -81,6 +208,42 @@ export default function Projects() {
   return (
     <>
       <CreateProjectDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
+      
+      <CreateProjectDialog 
+        open={!!editProjectId} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditProjectId(null);
+            setEditProjectData(null);
+          }
+        }}
+        projectId={editProjectId || undefined}
+        initialData={editProjectData || undefined}
+      />
+
+      <AlertDialog open={!!deleteProjectId} onOpenChange={(open) => !open && setDeleteProjectId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Project</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deleteProjectName}"? This action cannot be undone and will permanently remove the project and all its data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       
       <div className="h-full overflow-auto">
         <div className="p-6 space-y-6">
@@ -150,6 +313,9 @@ export default function Projects() {
                   dueDate={project.dueDate || ""}
                   assignedUsernames={project.assignedUsernames}
                   activeWorkflows={0}
+                  onEdit={handleEditProject}
+                  onArchive={handleArchiveProject}
+                  onDelete={handleDeleteProject}
                 />
               ))}
             </div>
@@ -164,6 +330,9 @@ export default function Projects() {
                 assignedUsernames: project.assignedUsernames,
                 activeWorkflows: 0,
               }))}
+              onEdit={handleEditProject}
+              onArchive={handleArchiveProject}
+              onDelete={handleDeleteProject}
             />
           )}
         </div>
