@@ -712,7 +712,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const validatedData = insertProjectSchema.parse(req.body);
+      const validatedData = insertProjectSchema.omit({ ownerId: true }).parse(req.body);
       const project = await storage.createProject({
         ...validatedData,
         ownerId: user.id,
