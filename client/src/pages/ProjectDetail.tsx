@@ -339,12 +339,11 @@ export default function ProjectDetail() {
           open={editDialogOpen}
           onOpenChange={setEditDialogOpen}
           projectId={projectId}
-          initialData={project ? {
+            initialData={project ? {
             name: project.name,
             description: project.description,
             status: project.status as "planning" | "active" | "on-hold" | "completed",
             dueDate: project.dueDate,
-            ownerId: project.ownerId,
             userIds: assignedUsers.map(u => u.id),
             formIds: project.forms.map(f => f.id),
             workflowIds: project.workflows.map(w => w.id),
