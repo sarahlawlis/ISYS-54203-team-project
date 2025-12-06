@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, MoreVertical, Users } from "lucide-react";
+import { Calendar, Menu, Users } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -90,8 +90,8 @@ export function ProjectCard({
           <div onClick={handleMenuClick}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" data-testid={`button-project-menu-${id}`}>
-                  <MoreVertical className="h-4 w-4" />
+                <Button variant="ghost" size="icon" aria-label="Hamburger" data-testid={`button-project-menu-${id}`}>
+                  <Menu className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
