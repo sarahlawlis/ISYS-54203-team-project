@@ -90,7 +90,7 @@ export function ProjectCard({
           <div onClick={handleMenuClick}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Hambruger" data-testid={`button-project-menu-${id}`}>
+                <Button variant="ghost" size="icon" aria-label="Hamburger" data-testid={`button-project-menu-${id}`}>
                   <Menu className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
